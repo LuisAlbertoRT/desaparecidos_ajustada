@@ -1,0 +1,6 @@
+# Perfil del notebook 6_PPT_Reporte_Diario.
+# Comparte por completo la capa A con `estatal`, así que la primera de las dos
+# que corra paga el matching y la segunda lee el caché.
+extends = "base"
+
+estado = "nacional"    # el reporte diario siempre es nacional

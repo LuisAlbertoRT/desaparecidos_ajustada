@@ -1,0 +1,105 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Perfil BASE — valores por defecto de todo el pipeline.
+# Los demás perfiles heredan de éste con `extends = "base"` y sólo sobrescriben
+# lo que cambia. Nunca se edita config.py para "reconfigurar" una corrida.
+#
+# Los campos están agrupados por CAPA. Cambiar un campo de la capa A invalida
+# el caché de matching (minutos de recálculo); cambiar uno de la capa C no
+# invalida nada (la rebanada es una máscara booleana).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── CAPA A · MATCHING ────────────────────────────────────────────────────────
+# Rutas relativas a la raíz del proyecto. Si se omiten, se toman de config.py.
+# rnpdno_etl_parquet = "output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet"
+# banci_etl_parquet  = "output/Resultado_2_Procesamiento_ETL_BANCI.parquet"
+# confrontas_file    = "output/Resultado_3_Procesamiento_ETL_PUI.parquet"
+
+# Orden de PRIORIDAD de la cascada (no el de ejecución): el primero que tenga un
+# match válido para una fila se queda con ella.
+#
+# `manual` va primero porque son pares que una persona del SESNSP revisó y validó
+# uno por uno. Cuando el estándar y una confirmación humana señalan a PERSONAS
+# DISTINTAS —pasa en 78 filas— gana la revisión humana. Con `estandar` al frente se
+# perdían 54 validaciones sin dejar rastro: el algoritmo pisaba al revisor.
+orden_prioridad_cascada = ["manual", "estandar", "refinado"]
+
+# ¿Los motores corren EN CADENA (cada uno recibe sólo lo que el anterior no
+# resolvió) o EN PARALELO (los tres ven el universo completo)?
+#
+# false = paralelo. Es lo que permite saber que dos métodos independientes
+#         llegaron al mismo FUB (`metodos_concurrentes` en la exportación: hoy
+#         4,629 FUB los sostienen `estandar` y `refinado` a la vez) y en cuántas
+#         filas se contradicen. Se paga corriendo el motor refinado sobre TODO.
+# true  = en cadena, en el orden de `orden_prioridad_cascada`. El refinado deja
+#         de mirar las filas ya resueltas. Más rápido, pero la corroboración
+#         cruzada desaparece: si el estándar resuelve una fila, el refinado ya no
+#         la ve y nunca se sabrá si coincidían.
+cascada_en_ejecucion = false
+
+# Período con el que se acotan las fechas de BANCI al ejecutar el motor estándar.
+periodo_match = "01oct24-max"
+
+# Corte del sexenio: acota el universo RNPDNO que ven los motores manual y refinado.
+fecha_sexenio = "2024-10-01"
+
+# Reglas de post-procesamiento aplicadas tras la cascada, en orden.
+# Registradas en src/pipeline/reglas.py. Quitar una de esta lista la desactiva;
+# así se obtienen "versiones" del pipeline sin bifurcar el notebook.
+#   excluir_revision_manual  → los candidatos 'revision manual' del refinado no
+#                              cuentan como match confirmado (paridad con v6).
+#   regla_r_desfase_dias     → excluye matches con desfase > tolerancia o cuyo
+#                              FUB está Localizado en RNPDNO (regla R estricta).
+#   actualizar_rn_con_banci  → BANCI sobrescribe dependencia_origen/carpeta en RNPDNO.
+reglas_post = ["excluir_revision_manual", "regla_r_desfase_dias", "actualizar_rn_con_banci"]
+tolerancia_desfase_dias = 10
+
+# Excluye del cruce a los LOCALIZADOS de BANCI (equivalente a
+# FILTRAR_SOLO_NO_LOCALIZADOS de normalizar_folios_v6.py). Gobierna los dos sitios
+# donde se aplicaba por separado: el filtro interno del motor estándar
+# (`preparar_banci_r`) y el universo del refinado.
+filtrar_banci_no_localizados = true
+
+# Excluye del cruce a los LOCALIZADOS del RNPDNO en los motores manual y refinado
+# (CLASIF_UNIVERSO en src/pipeline/motores.py). En false entra el RNPDNO completo.
+#
+# Ojo con apagarlo: un localizado puede casar con un desaparecido por folio y
+# generar matches espurios, y el sistema está calibrado para equivocarse hacia el
+# lado contrario (mejor dejar dos registros sin unir que fusionar a dos personas).
+# Para un cruce total usa el perfil `cruce_total`, que no toca los conteos del
+# reporte diario porque tiene su propia llave de caché.
+filtrar_rnpdno_clasificacion = true
+
+# ¿El motor manual acepta como match el FUB que BANCI ya trae en `folio_RNPDNO`?
+# false = NO. Ese FUB viene pre-asignado río arriba y aceptarlo no compara nombre,
+# CURP, fecha ni carpeta: lo único que se verifica es que exista en el RNPDNO. No es
+# evidencia, así que esos registros se dejan para el motor refinado, donde el FUB
+# sigue contando como señal pero tiene que sostenerse contra la identidad.
+# Ponerlo en true reactiva la fuente sin tocar código.
+manual_usar_fub_preasignado = false
+
+# Revisiones SESNSP (opcionales; si el archivo no existe el descuento se omite).
+refinado_hoja_verif       = 0
+refinado_hoja_revision    = 1
+refinado_skiprows_verif   = 1
+refinado_skiprows_revision = 0
+
+# ── CAPA B · DERIVADAS ───────────────────────────────────────────────────────
+# Modalidad de clasificación de carpeta de investigación.
+# Por defecto se hereda de config.MODALIDAD_CLASIFICACION_CARPETA; descomenta
+# aquí SÓLO si este reporte necesita una modalidad distinta a la del proyecto.
+#   1 = regex general RNPDNO_REGEX_CARPETA
+#   2 = catálogo de regex por entidad (CATALOGO_REGEX_CI_POR_ENTIDAD)
+#   3 = catálogo CATALOGO_REGEX_CI_POR_ENTIDAD_2 + siglas de Oaxaca (NOMENCLATURAS_OAXACA)
+#   4 = unión de la 2 y la 3 (CATALOGO_REGEX_CI_POR_ENTIDAD_3)
+# modalidad_clasificacion_carpeta = 2
+# Sumar (true) o no (false) todos los FUBs de los archivos (Parquet o Excel) de input/carpetas_manuales. Por defecto se hereda de config.MODALIDAD_MANUAL_CLASIFICACION_CARPETA.
+# modalidad_manual_clasificacion_carpeta = false
+
+# ── CAPA C · REBANADAS ───────────────────────────────────────────────────────
+# `estado` es una dimensión de corte, NO un filtro previo al matching.
+# null = universo nacional. Puede ser clave numérica (17) o nombre ("Morelos").
+estado = "nacional"
+
+# Períodos adicionales o sobrescritos respecto al catálogo de config.py.
+# [periodos]
+# "01ene25-max" = ["2025-01-01", ""]

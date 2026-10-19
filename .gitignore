@@ -1,0 +1,78 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Entornos locales y archivos temporales de Python/R
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+.DS_Store
+Thumbs.db
+
+# Resultados regenerables y carpetas de compilación
+input/
+output/
+PUI_Python/input/
+PUI_Python/output/
+input/plantillas/
+codigos_temporales/
+# Repositorio independiente, con remoto propio
+/Desaparecidos_python/
+build/
+dist/
+*.egg-info/
+
+# Configuración local de Claude Code: se queda en cada máquina, no en GitHub
+.claude/
+
+# --- Credenciales: nunca versionar ---
+# Las instrucciones NO viven aquí (no son secretas): docs/9_credenciales_google_drive.md
+/.secrets/*
+!/.secrets/.gitignore
+# Red de seguridad por si alguien deja una credencial fuera de `.secrets/`.
+.env
+.env.*
+.Renviron
+credentials*.json
+token*.json
+client_secret*.json
+service_account*.json
+*.pem
+*.p12
+
+
+# Configuración local del editor
+.vscode/
+
+# Datos: nunca versionar
+*.xlsx
+*.xls
+*.csv
+*.parquet
+*.RData
+*.rds
+*.feather
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Documentos derivados que se regeneran desde las fuentes Markdown
+/DOCUMENTACION_COMPLETA.pdf
+/MANUAL_DE_USUARIO_CONCEPTUAL.pdf
+
+# Arial tiene licencia de Microsoft que no permite redistribuirla (el código usa Montserrat/Poppins)
+0_fonts/Arial*.ttf

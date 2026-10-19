@@ -1,0 +1,5 @@
+# Nada de este directorio se versiona, salvo la documentación y las plantillas.
+*
+!.gitignore
+!README.md
+!*.ejemplo

@@ -1,0 +1,8 @@
+# Perfil de las PPT estatales.
+# `estado` se sobrescribe por entidad al momento de construir la rebanada:
+#     cfg_ent = cfg.con(estado=17)
+# El universo NO se reconstruye: las 32 entidades comparten una sola corrida
+# de matching porque la entidad dejó de filtrarse antes de los motores.
+extends = "base"
+
+estado = "nacional"

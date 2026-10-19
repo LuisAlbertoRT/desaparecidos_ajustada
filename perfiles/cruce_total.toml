@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Perfil CRUCE TOTAL — todo BANCI contra todo RNPDNO.
+#
+# Quita los CINCO filtros de universo que trae el perfil base, para que ninguna
+# carpeta y ningún reporte queden fuera del cruce por su estatus o su fecha:
+#
+#   1. BANCI localizados, en el motor estándar   → filtrar_banci_no_localizados
+#   2. BANCI localizados, en el motor refinado   → filtrar_banci_no_localizados
+#   3. RNPDNO localizados (manual y refinado)    → filtrar_rnpdno_clasificacion
+#   4. RNPDNO pre-sexenio (manual y refinado)    → fecha_sexenio
+#   5. Matches anulados por FUB localizado o por
+#      desfase de fecha > 10 días                → reglas_post
+#
+# QUÉ **NO** CAMBIA, Y POR QUÉ
+# ----------------------------
+# Los guardianes anti-homónimo de cada motor siguen intactos: la fecha de
+# nacimiento que contradice sigue siendo un rechazo terminante, el nombre sigue
+# necesitando corroboración, y los umbrales del refinado no se tocan. Esto abre
+# el UNIVERSO (qué registros pueden compararse), no el CRITERIO (qué evidencia
+# hace falta para afirmar que dos registros son la misma persona). Aflojar lo
+# segundo fusionaría homónimos a gran escala: sólo en el nivel 3 del motor
+# estándar, el nombre exacto abre candidatos que hoy se descartan por fecha.
+#
+# ADVERTENCIA
+# -----------
+# Este perfil produce MÁS matches y algunos serán espurios: es justo lo que los
+# filtros 1–5 evitaban. No lo uses para los indicadores ni para las PPT —para eso
+# está `reporte_diario`—. Su llave de caché es distinta, así que las dos corridas
+# coexisten sin pisarse y cada una exporta a su propia carpeta.
+# ─────────────────────────────────────────────────────────────────────────────
+extends = "base"
+
+# ── CAPA A · MATCHING ────────────────────────────────────────────────────────
+# Los motores corren en cadena: el refinado —el caro— recibe sólo lo que el manual
+# y el estándar no resolvieron. Con el universo completo (408,600 registros de
+# RNPDNO) correrlo sobre todo BANCI es inviable.
+cascada_en_ejecucion = true
+
+# Sin acotar el período de BANCI en el motor estándar.
+periodo_match = "min-max"
+
+# Sin corte de sexenio: entra todo el histórico del RNPDNO.
+fecha_sexenio = "1900-01-01"
+
+# Entran los localizados de las dos bases.
+filtrar_banci_no_localizados = false
+filtrar_rnpdno_clasificacion = false
+
+# Se conserva `excluir_revision_manual`: un candidato sin validar no es un match,
+# y en la exportación viaja igual como `candidato_revision_manual`.
+# Se retira `regla_r_desfase_dias`, que es la que anulaba los matches por FUB
+# localizado y por desfase de fecha.
+reglas_post = ["excluir_revision_manual", "actualizar_rn_con_banci"]
+
+# ── CAPA C · REBANADAS ───────────────────────────────────────────────────────
+estado = "nacional"
