@@ -50,9 +50,9 @@ desaparecidos/
 ├── 1_funciones/              # Módulo de graficación
 ├── input/                    # Archivos inmutables (no se sobreescriben)
 └── output/
-    ├── Resultado_1_Procesamiento_ETL_RNPDNO.parquet
-    ├── Resultado_2_Procesamiento_ETL_BANCI.parquet
-    ├── Resultado_3_Procesamiento_ETL_PUI.parquet   # lo lee config.CONFRONTAS_FILE
+    ├── Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet   # lectura del pipeline
+    ├── Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet    # lectura del pipeline
+    ├── Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet      # lo lee config.CONFRONTAS_FILE
     ├── cache/                # Caché del pipeline (regenerable, se puede borrar)
     │   ├── matching/<clave>/ # nivel 1: el cruce (sólo las columnas que se leen después)
     │   └── universo/<clave>/ # nivel 2: rn.parquet + ba.parquet con banderas
@@ -212,7 +212,7 @@ Un detalle a tener presente:
 indicio de vida en la PUI) al RNPDNO. Desde que existe el notebook 3, apunta a un Parquet de `output/`:
 
 ```python
-CONFRONTAS_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI.parquet"
+CONFRONTAS_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet"
 ```
 
 Antes se entregaba a mano como Excel en `input/confrontas/`, y esa carpeta ya no forma parte

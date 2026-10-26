@@ -10,9 +10,9 @@
 
 # ── CAPA A · MATCHING ────────────────────────────────────────────────────────
 # Rutas relativas a la raíz del proyecto. Si se omiten, se toman de config.py.
-# rnpdno_etl_parquet = "output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet"
-# banci_etl_parquet  = "output/Resultado_2_Procesamiento_ETL_BANCI.parquet"
-# confrontas_file    = "output/Resultado_3_Procesamiento_ETL_PUI.parquet"
+# rnpdno_etl_parquet = "output/Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet"
+# banci_etl_parquet  = "output/Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet"
+# confrontas_file    = "output/Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet"
 
 # Orden de PRIORIDAD de la cascada (no el de ejecución): el primero que tenga un
 # match válido para una fila se queda con ella.

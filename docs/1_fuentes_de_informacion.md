@@ -13,8 +13,9 @@ input/rnpdno/reporte_personas_DDMMAAAA.xlsx               ← el Excel de tres h
 ```
 
 El reporte de búsqueda que levantan las comisiones. Es el universo de **personas**
-(408,459 registros en el corte vigente). Lo consume `1_Procesamiento_ETL_RNPDNO.ipynb`,
-que lo deja en `output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet`.
+(408,459 registros en el corte vigente). Lo procesa `1_Procesamiento_ETL_RNPDNO.ipynb`;
+el notebook oficial escribe `output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet` y el
+pipeline lector usa `output/Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet`.
 
 En modo `local` el archivo concreto se fija en `config.RNPDNO_LOCAL_FILE` — control
 estricto, sin búsqueda por patrón, para que una corrida sea reproducible. En modo `drive`
@@ -45,7 +46,8 @@ input/banci/
 ```
 
 Las carpetas de investigación abiertas por las fiscalías. Es el universo **judicial**
-(34,777 registros). Lo consume `2_Procesamiento_ETL_BANCI.ipynb` → `output/Resultado_2_Procesamiento_ETL_BANCI.parquet`.
+(34,777 registros). Lo procesa `2_Procesamiento_ETL_BANCI.ipynb`; el pipeline lector usa
+`output/Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet`.
 
 ### PUI — Plataforma Única de Identidad
 
@@ -59,11 +61,12 @@ archivos, no uno:
 | `PUI_REGISTROS_FILE` | `registros` (confrontas manuales) | las confrontas que se revisaron a mano (Excel, 5 columnas) |
 | `PUI_DEFUNCIONES_FILE` | `defunciones_df` | actas de defunción por institución (Excel, 2 columnas) |
 
-Los tres los consume `3_Procesamiento_ETL_PUI.ipynb` →
-`output/Resultado_3_Procesamiento_ETL_PUI.parquet`, que es a lo que apunta
-`config.CONFRONTAS_FILE`. Ese cuaderno necesita además el Parquet del notebook 1 como
-`comprimido`, del que toma `clasificacion_des`, `fecha_hechos_modificada` y la **CURP
-imputada** (`curp_vic_derivada_rnpdno`): es la única dependencia entre notebooks de ETL.
+Los tres los procesa `3_Procesamiento_ETL_PUI.ipynb`, que escribe
+`output/Resultado_3_Procesamiento_ETL_PUI.parquet`. El pipeline lector apunta por defecto
+`config.CONFRONTAS_FILE` a `output/Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet`.
+El cuaderno PUI necesita además el Parquet autónomo del notebook 1 como `comprimido`, del
+que toma `clasificacion_des`, `fecha_hechos_modificada` y la **CURP imputada**
+(`curp_vic_derivada_rnpdno`): es la única dependencia entre notebooks de ETL.
 
 El CSV de coincidencias llega comprimido desde una carpeta de Google Drive, bajo el patrón
 `reporte_coincidencias_validas_YYYY-MM-DD.zip`. En modo `drive` —el de por omisión— el propio
@@ -187,13 +190,16 @@ su población no sale del RNPDNO ni de BANCI, y lo único que se le pide al univ
 
 ## Salidas del ETL
 
-Los tres notebooks de ETL dejan un Parquet de nombre fijo en `output/`. Son la entrada de
-la CAPA A del pipeline:
+Los ETL oficiales mantienen sus Parquet de salida; las corridas autónomas generan además
+Parquet separados. La CAPA A lee por defecto las versiones `_autonomo`:
 
 | Constante | Archivo |
 |---|---|
-| `ETL_RNPDNO_OUTPUT_FILE` | `output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet` |
-| `ETL_BANCI_OUTPUT_FILE` | `output/Resultado_2_Procesamiento_ETL_BANCI.parquet` |
-| `ETL_PUI_OUTPUT_FILE` | `output/Resultado_3_Procesamiento_ETL_PUI.parquet` (= `CONFRONTAS_FILE`) |
+| `ETL_RNPDNO_OUTPUT_FILE` | `output/Resultado_1_Procesamiento_ETL_RNPDNO.parquet` (destino del ETL oficial) |
+| `ETL_BANCI_OUTPUT_FILE` | `output/Resultado_2_Procesamiento_ETL_BANCI.parquet` (destino del ETL oficial) |
+| `ETL_PUI_OUTPUT_FILE` | `output/Resultado_3_Procesamiento_ETL_PUI.parquet` (destino del ETL oficial) |
+| `ETL_RNPDNO_INPUT_FILE` | `output/Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet` (lectura aguas abajo) |
+| `ETL_BANCI_INPUT_FILE` | `output/Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet` (lectura aguas abajo) |
+| `ETL_PUI_INPUT_FILE` / `CONFRONTAS_FILE` | `output/Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet` (lectura aguas abajo) |
 
 Las presentaciones también: `PPT_DIARIO_FILE` y `PPT_ESTATAL_DIR`.

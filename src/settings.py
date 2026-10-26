@@ -185,10 +185,10 @@ class Settings:
         # Rutas: default a lo que ya define config.py (backward-compatible)
         d["rnpdno_etl_parquet"] = _resolver_ruta(
             d.get("rnpdno_etl_parquet")
-        ) or (_cfg("OUTPUT_DIR") / "Resultado_1_Procesamiento_ETL_RNPDNO.parquet")
+        ) or _cfg("ETL_RNPDNO_INPUT_FILE")
         d["banci_etl_parquet"] = _resolver_ruta(
             d.get("banci_etl_parquet")
-        ) or (_cfg("OUTPUT_DIR") / "Resultado_2_Procesamiento_ETL_BANCI.parquet")
+        ) or _cfg("ETL_BANCI_INPUT_FILE")
         d["confrontas_file"] = _resolver_ruta(d.get("confrontas_file")) or _cfg("CONFRONTAS_FILE")
         d["refinado_ruta_verif"] = _resolver_ruta(
             d.get("refinado_ruta_verif")

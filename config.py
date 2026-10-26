@@ -269,7 +269,15 @@ CATALOGO_MUNICIPIOS_FILE = INPUT_DIR / "catalogos_inegi" / "catalogo_municipios_
 # Antes se entregaba a mano como Excel en input/confrontas/; esa carpeta ya no es parte del
 # pipeline. El lector (src/pipeline/carga.py) sigue aceptando .xlsx, así que un perfil puede
 # apuntar a un archivo antiguo si hace falta.
-CONFRONTAS_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI.parquet"
+# Rutas de lectura que consume el pipeline de indicadores/matching. Se leen las
+# salidas autónomas. Las constantes ETL_*_OUTPUT_FILE de abajo se conservan como
+# destinos de escritura de los notebooks oficiales 1–3 y como referencias históricas.
+ETL_RNPDNO_INPUT_FILE = OUTPUT_DIR / "Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet"
+ETL_BANCI_INPUT_FILE = OUTPUT_DIR / "Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet"
+ETL_PUI_INPUT_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet"
+
+# Archivo de Registros Administrativos (Confrontas) que carga el pipeline.
+CONFRONTAS_FILE = ETL_PUI_INPUT_FILE
 # Mapeos de nombres de columnas para el archivo de confrontas
 # Lo que carga.py toma de Resultado_3 (o de un Excel de confrontas entregado a mano,
 # que usa los nombres sin sufijo): el FUB y la indicadora de indicio de vida.
@@ -442,7 +450,8 @@ PUI_REFERENCIA_FILE = None
 # ─────────────────────────────────────────────────────────────────────────────
 # SALIDAS DE LOS NOTEBOOKS DE ETL
 # ─────────────────────────────────────────────────────────────────────────────
-# Nombre fijo, sin fecha: son el contrato entre los notebooks.
+# Nombre fijo, sin fecha: destinos de escritura de los ETL oficiales. Los
+# consumidores del pipeline usan ETL_*_INPUT_FILE, que apunta a *_autonomo.parquet.
 ETL_RNPDNO_OUTPUT_FILE = OUTPUT_DIR / "Resultado_1_Procesamiento_ETL_RNPDNO.parquet"
 
 # Las columnas de la salida del notebook 1, en orden. Es un contrato: el notebook
