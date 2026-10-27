@@ -88,6 +88,7 @@ def _firma_archivo(p: Optional[Path]) -> str:
 # con la misma capa A comparten caché—. Todo campo nuevo entra por defecto: olvidar
 # anotarlo aquí cuesta un recálculo de más, nunca un caché viejo.
 _CAMPOS_CAPA_B = ("modalidad_clasificacion_carpeta", "modalidad_manual_clasificacion_carpeta",
+                  "usar_estado_extraido_para_clasificar_carpeta",
                   "propagar_delito_banci")
 _CAMPOS_FUERA_DE_CAPA_A = {"perfil", "estado", "periodos", "cache_dir", "resultados_dir",
                            *_CAMPOS_CAPA_B}
@@ -149,6 +150,9 @@ class Settings:
     # ── CAPA B · DERIVADAS (barata: segundos) ────────────────────────────────
     # Por defecto se toma de config.MODALIDAD_CLASIFICACION_CARPETA.
     modalidad_clasificacion_carpeta: Optional[int] = None
+    # El estado extraído de la dependencia, en vez del `idestado` del RNPDNO,
+    # para seleccionar el catálogo de folios por entidad.
+    usar_estado_extraido_para_clasificar_carpeta: Optional[bool] = None
     # Suma a la modalidad todos los FUBs de los Excel de revisión manual
     # (config.CARPETAS_MANUALES_DIR). Por defecto se toma de
     # config.MODALIDAD_MANUAL_CLASIFICACION_CARPETA.
@@ -200,6 +204,9 @@ class Settings:
         # La modalidad de carpeta la manda config.py salvo que el perfil la sobrescriba.
         if d.get("modalidad_clasificacion_carpeta") is None:
             d["modalidad_clasificacion_carpeta"] = _cfg("MODALIDAD_CLASIFICACION_CARPETA", 1)
+        if d.get("usar_estado_extraido_para_clasificar_carpeta") is None:
+            d["usar_estado_extraido_para_clasificar_carpeta"] = bool(
+                _cfg("USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA", False))
         if d.get("modalidad_manual_clasificacion_carpeta") is None:
             d["modalidad_manual_clasificacion_carpeta"] = bool(
                 _cfg("MODALIDAD_MANUAL_CLASIFICACION_CARPETA", False))
@@ -335,6 +342,7 @@ class Settings:
             f"  Cascada     : {' → '.join(self.orden_prioridad_cascada)}\n"
             f"  Carpeta     : modalidad {self.modalidad_clasificacion_carpeta}"
             f"{' + revisión manual' if self.modalidad_manual_clasificacion_carpeta else ''}\n"
+            f"  Estado CI   : {'extraído' if self.usar_estado_extraido_para_clasificar_carpeta else 'RNPDNO'}\n"
             f"  Reglas post : {', '.join(self.reglas_post) or '(ninguna)'}\n"
             f"  Entidad     : {config.ENTIDADES.get(self.estado, 'Nacional') if self.estado else 'Nacional'}"
             f"  (dimensión de rebanada, no filtro pre-matching)\n"

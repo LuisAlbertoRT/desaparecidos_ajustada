@@ -308,8 +308,9 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
     estado_final, estado_texto, estado_respaldo = _resolver_estado_extraido(
         dependencia_estado, ids_estado
     )
+    id_estado_final = _id_estado_extraido(estado_final)
     out["estado_final_nuevo"] = estado_final
-    out["idestado_final_nuevo"] = _id_estado_extraido(estado_final)
+    out["idestado_final_nuevo"] = id_estado_final
 
     if verbose:
         total = len(rn)
@@ -420,14 +421,19 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
     # persona le faltan campos de identificación).
     from src.cleaning import clasificar_carpeta, carpeta_validada_manual
     col_ent_rn = _primera(rn, ["idestado_derivada_rnpdno", "idestado"])
+    entidad_carpeta = (
+        id_estado_final
+        if cfg.usar_estado_extraido_para_clasificar_carpeta
+        else rn[col_ent_rn] if col_ent_rn else None
+    )
     if "expedientes_rnpdno" in rn.columns:
         vacio = rn["expedientes_rnpdno"].astype("object").fillna("").astype(str).str.strip().eq("").to_numpy()
         # La modalidad 1 no necesita la entidad; la 2, la 3 y la 4 sí, y sin ella no pueden
         # evaluar nada, así que se conserva el respaldo en ceros.
         usa_entidad = cfg.modalidad_clasificacion_carpeta != 1
-        valido = (clasificar_carpeta(rn["expedientes_rnpdno"], rn[col_ent_rn],
+        valido = (clasificar_carpeta(rn["expedientes_rnpdno"], entidad_carpeta,
                                      modalidad=cfg.modalidad_clasificacion_carpeta).to_numpy()
-                  if col_ent_rn or not usa_entidad else np.zeros(len(rn), dtype=bool))
+                  if entidad_carpeta is not None or not usa_entidad else np.zeros(len(rn), dtype=bool))
     else:
         vacio = np.ones(len(rn), dtype=bool)
         valido = np.zeros(len(rn), dtype=bool)

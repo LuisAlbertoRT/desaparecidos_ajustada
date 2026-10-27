@@ -4,3 +4,4 @@
 extends = "base"
 
 estado = "nacional"    # el reporte diario siempre es nacional
+usar_estado_extraido_para_clasificar_carpeta = true

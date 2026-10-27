@@ -8,6 +8,7 @@ from src.pipeline.derivadas import (
     _resolver_estado_extraido,
     columna_dimension,
 )
+from src.settings import Settings
 
 
 class ResolverEstadoExtraidoTests(unittest.TestCase):
@@ -110,6 +111,29 @@ class ResolverEstadoExtraidoTests(unittest.TestCase):
         self.assertEqual(texto.iloc[0], config.ENTIDADES[15])
         self.assertEqual(respaldo.iloc[0], config.ENTIDADES[9])
         self.assertNotEqual(texto.iloc[0], respaldo.iloc[0])
+
+    def test_estado_extraido_para_clasificar_carpeta_es_configurable(self):
+        anterior = config.USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA
+        try:
+            config.USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA = False
+            self.assertFalse(
+                Settings.desde_dict({}).usar_estado_extraido_para_clasificar_carpeta
+            )
+            config.USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA = True
+            self.assertTrue(
+                Settings.desde_dict({}).usar_estado_extraido_para_clasificar_carpeta
+            )
+        finally:
+            config.USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA = anterior
+
+    def test_cambiar_estado_de_clasificacion_invalida_cache_de_derivadas(self):
+        estado_rnpdno = Settings.desde_dict({
+            "usar_estado_extraido_para_clasificar_carpeta": False,
+        })
+        estado_extraido = Settings.desde_dict({
+            "usar_estado_extraido_para_clasificar_carpeta": True,
+        })
+        self.assertNotEqual(estado_rnpdno.clave_universo, estado_extraido.clave_universo)
 
 
 if __name__ == "__main__":

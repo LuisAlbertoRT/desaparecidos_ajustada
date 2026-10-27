@@ -269,12 +269,10 @@ CATALOGO_MUNICIPIOS_FILE = INPUT_DIR / "catalogos_inegi" / "catalogo_municipios_
 # Antes se entregaba a mano como Excel en input/confrontas/; esa carpeta ya no es parte del
 # pipeline. El lector (src/pipeline/carga.py) sigue aceptando .xlsx, así que un perfil puede
 # apuntar a un archivo antiguo si hace falta.
-# Rutas de lectura que consume el pipeline de indicadores/matching. Se leen las
-# salidas autónomas. Las constantes ETL_*_OUTPUT_FILE de abajo se conservan como
-# destinos de escritura de los notebooks oficiales 1–3 y como referencias históricas.
-ETL_RNPDNO_INPUT_FILE = OUTPUT_DIR / "Resultado_1_Procesamiento_ETL_RNPDNO_autonomo.parquet"
-ETL_BANCI_INPUT_FILE = OUTPUT_DIR / "Resultado_2_Procesamiento_ETL_BANCI_autonomo.parquet"
-ETL_PUI_INPUT_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI_autonomo.parquet"
+# Rutas de lectura y escritura compartidas por los ETL oficiales y el pipeline.
+ETL_RNPDNO_INPUT_FILE = OUTPUT_DIR / "Resultado_1_Procesamiento_ETL_RNPDNO.parquet"
+ETL_BANCI_INPUT_FILE = OUTPUT_DIR / "Resultado_2_Procesamiento_ETL_BANCI.parquet"
+ETL_PUI_INPUT_FILE = OUTPUT_DIR / "Resultado_3_Procesamiento_ETL_PUI.parquet"
 
 # Archivo de Registros Administrativos (Confrontas) que carga el pipeline.
 CONFRONTAS_FILE = ETL_PUI_INPUT_FILE
@@ -451,7 +449,7 @@ PUI_REFERENCIA_FILE = None
 # SALIDAS DE LOS NOTEBOOKS DE ETL
 # ─────────────────────────────────────────────────────────────────────────────
 # Nombre fijo, sin fecha: destinos de escritura de los ETL oficiales. Los
-# consumidores del pipeline usan ETL_*_INPUT_FILE, que apunta a *_autonomo.parquet.
+# consumidores del pipeline usan ETL_*_INPUT_FILE, que apunta a estos mismos destinos.
 ETL_RNPDNO_OUTPUT_FILE = OUTPUT_DIR / "Resultado_1_Procesamiento_ETL_RNPDNO.parquet"
 
 # Las columnas de la salida del notebook 1, en orden. Es un contrato: el notebook
@@ -1059,6 +1057,11 @@ ENTIDADES = {
 # 4: Unión de la 2 y la 3 con CATALOGO_REGEX_CI_POR_ENTIDAD_3, sin la capa de siglas de Oaxaca
 MODALIDAD_CLASIFICACION_CARPETA = 4
 
+# False: clasifica con `idestado_derivada_rnpdno` (estado del RNPDNO).
+# True: usa `idestado_final_nuevo`, la clave numérica del estado extraído que se
+# presenta como `estado_final_nuevo`.
+USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA = True
+
 # Validación manual de carpeta, encima de MODALIDAD_CLASIFICACION_CARPETA:
 # True  → valen las carpetas que valida la modalidad MÁS todos los registros de los
 #         archivos de CARPETAS_MANUALES_DIR, aunque su folio no pase el regex de la
@@ -1137,34 +1140,35 @@ NOMENCLATURAS_BCS = ["LPZ", "TS", "PLN", "LBR", "SGO", "SJC", "CSL", "CST",
 # Prefijo de los folios de Coahuila: CI o APP, con puntos opcionales (en R: `prefijo_coah`).
 PREFIJO_COAH = r"(?:c\.?i\.?|a\.?p\.?p\.?)"
 
+
 CATALOGO_REGEX_CI_POR_ENTIDAD_2 = {
     "Aguascalientes": r"^(?:CI|CH|ACTC)[-/][A-Za-z]{3}[-/]\d{5}[-/](0[1-9]|1[0-2])[-/]\d{2}$",
-    "Baja California": r"^(?i)(?:[a-z]+[-/]?)?\d(?:[-/]?\d{2})(?:[-/]?\d{3})(?:[-/]?\d{4})(?:[-/]?\d{5})$",
+    "Baja California": r"^(?i)\d{4}[-/]\d{4}[-/]\d{5}(?:[-/](?:AP|AC|NAC|NUC))?$",
     "Baja California Sur": rf"^(?i)(?:{'|'.join(NOMENCLATURAS_BCS)})(?:[-/]?[1-9]\d*)(?:[-/]?[a-z0-9]+)(?:[-/]?(?:nuc|\d{{4}}))$",
-    "Chiapas": r"^(?i)\d{4}(?:[-/]?\d{3})(?:[-/]?\d{4})(?:[-/]?\d{4,5})$",
+    "Chiapas": r"^(?i)C\.I\.\d{4}[-/]\d{3}[-/]\d{4}[-/]\d{4,5}$",
     "Chihuahua": r"^(?i)\d{2}(?:[-/]?\d{4})(?:[-/]?\d{7})$",
-    "Ciudad de México": r"^(?i)(?:ci|ae)[-/](?:e[-/])?f[a-z0-9]+[-/][a-z0-9]+(?:[/-][a-z0-9]+)*[-/]ui[-/]?\d+(?:\s)?(?:[-/]?(?:s|c)[-/]d)[-/]\d{5}[-/](0[1-9]|1[0-2])[-/]\d{4}$",
+    "Ciudad de México": r"^(?i)(?:ci|ae)[-/](?:e[-/])?f[a-z0-9]+[-/][a-z0-9]+(?:[/-][a-z0-9]+)*[-/]ui[-/]?\d+(?:\s)?(?:[-/]?(?:s|c)[-/]d)[-/]\d{1,5}[-/](0[1-9]|1[0-2])[-/]\d{4}$",
     "Campeche": r"^(?i)(?:ci|ac)(?:[-/]?\d{1,3})(?:[-/]?\d{4})(?:[-/]?[1-9]\d*)$",
-    "Coahuila": rf"^(?i){PREFIJO_COAH}(?:[-/]?{PREFIJO_COAH})?[-/]\d+[-/](?:\d{{4}}|[a-z]+)(?:[-/](?:ulpnl|atpd)[-/]\d{{4}})?$",
+    "Coahuila": rf"(?i)^{PREFIJO_COAH}(?:[-/]?{PREFIJO_COAH})?[-/]?\d+[-/](?:\d{{4}}|[a-z]+)(?:[-/](?:ulpnl|atpdt?)[-/]\d{{4}})?$",
     "Colima": r"^(?i)nsjp/[a-z]{3}/(?:ci|ch)/[a-z0-9]{1,50}[ /][0-9]{1,3}/\d{4}$",
     "Durango": r"^(?i)c\.?(?:d\.?)?i\.?/fge/r[0-9]{1,2}(?:/[a-z]{3})?/\d+/\d{4}$",
     "Guanajuato": r"^(?i)\d+(?:[-/]?\d{4})$",
     "Guerrero": r"^(?i)(?:\d{14}(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])\d{2}|[a-z]{3}/[a-z]{2}/\d{2}/\d{3}/\d{4})$",
     "Hidalgo": r"^(?i)(?:(?:0[1-9]|1\d|20)(?:[-/]?\d{4})(?:[-/]?\d+)|fed[-/]hgo[-/]?[a-z]+(?:[-/]?\d+)(?:[-/]?\d{4}))$",
     "Jalisco": r"^(?i)[0-9-]+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",
-    "México": r"^(?i)(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2]))$",
-    "Morelos": r"^(?i)[a-z0-9]+(?:[-/]?\d+)(?:[-/]?\d{4})$",
+    "México": r"^(?i)(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2]))$",
+    "Morelos": r"^(?i)[a-z0-9]+(?:-[a-z0-9]+)?[-/]\d+[-/]\d{4}$",
     "Nuevo León": r"^(?i)[a-z0-9]+[-/]?\d{4}$",
     "Oaxaca": r"^(?i)\d+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",
     "Querétaro": r"^(?i)(?:ci[-/]?(?:[a-z]{3}[-/]?)?\d+[-/]?\d{4}|[1-4][-/]\d+[-/]\d+[-/]\d+[-/]\d{2}|[ivxlc]+[-/]?\d+[-/]?\d{4})$",
     "San Luis Potosí": r"^(?i)(?:cdi|csc)(?:[-/]?fge)(?:[-/]?(?:i|ii|iii|iv|v|vi))(?:[-/]?d(?:0[1-9]|1[0-3]))(?:[-/]?\d{5})(?:[-/]?\d{2})$",
     "Sinaloa": r"^(?i)(?:[a-z]{3,6}(?:[-/]?[a-z0-9]{2,10})(?:[-/]?\d{3,})(?:[-/]?\d{4})(?:[-/]?[a-z]{1,3})?|[a-z0-9]{3}(?:[-/]?\d+)(?:[-/]?\d{4}))$",
-    "Sonora": r"^(?i)[a-z0-9]{1,5}(?:[-/]?[a-z0-9]{1,5})(?:[-/]?[a-z0-9]{1,5})(?:[-/]?\d{1,4})(?:[-/]?[a-z0-9]{1,5})(?:[-/]?\d+)$",
+    "Sonora": r"^(?i)[a-z0-9]{1,5}(?:[-/]?[a-z0-9]{1,5})(?:[-/]?[a-z0-9]{1,5})(?:[-/]?\d{1,4})(?:[-/]?[a-z0-9]{1,5})(?:[-/]?\d{1,2})[-/]\d{4}$",
     "Tabasco": r"^(?i)ci[-/][a-z0-9_]{2,20}(?:[-/][a-z0-9_]{1,20}){0,3}[-/]?\d+[-/]?\d{4}$",
     "Tamaulipas": r"^(?i)(?:fgjt(?:[-/][a-z0-9]+){2,5}[-/]\d+[-/]\d{4}|\d{2}[-/]?\d{2}[-/]?\d{3}[-/]?\d+[-/]?\d{4})$",
-    "Tlaxcala": r"^[A-Za-z0-9. ]+[-/]?[0-9]+[-/]?[0-9]+[-/]?[0-9]{4}$",
+    "Tlaxcala": r"^C\.I\.\s?FG-[A-Za-z0-9]+[-/][0-9]+[-/][0-9]{4}$",
     "Veracruz": r"^(?i)(?:[a-z0-9]{1,6}(?:[-/]?\d+)(?:[-/]?\d{2,4})|(?:[a-z0-9]{1,12}[-/])+(?:feadpd|fedfp|fepd|feiddfpdcp|fedfpdcp|feiddfp|fedfpm)(?:[-/][a-z0-9]{1,12})*[-/]\d+[-/]\d{2,4})$",
-    "Yucatán": r"^(?i)(?:[a-z0-9]{2}(?:[-/]?\d{6})(?:[-/]?\d{4})|fge(?:[-/]?[a-z0-9._áéíóúñ_ -]+)(?:[-/]?[a-z0-9._ -]+)(?:[-/]?\d{4}))$",
+    "Yucatán": r"^(?i)(?:[a-z0-9]{2}(?:[-/]?\d{3,6})(?:[-/]?\d{4})|fge(?:[-/]?[a-z0-9.áéíóúñ -]+)(?:[-/]?[a-z0-9._ -]+)(?:[-/]?\d{4}))$",
     "Zacatecas": r"^(?i)(?:fgjez(?:[-/]?[a-z0-9_-]+)(?:[-/]?[a-z0-9_-]+)(?:[-/]?\d+)(?:[-/]?\d{4}[-/]?(?:0?[1-9]|1[0-2]))|\d+[-/]?\d{4}[-/]?(?:0?[1-9]|1[0-2])|av[-/]?\d+[-/]?\d{4}[-/]?(?:0?[1-9]|1[0-2]))$",
     "Nayarit": r"^(?i)nay(?:[-/]?[a-z0-9]{2,5})(?:[-/]?m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))(?:[-/]?(?:ci|rh))(?:[-/]?\d{5,7})(?:[-/]?\d{4})$",
     "Michoacán": r"^[A-Za-z0-9]{2,10}[-/]?[0-9]+(?:[-/]?[0-9]+)?[-/]?[0-9]{4}$",
