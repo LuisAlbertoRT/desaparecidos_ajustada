@@ -205,8 +205,8 @@ class Universo:
     def columna(self, s, dimension: str) -> str:
         """Nombre de la columna de una dimensión (`fecha`, `cve_ent`, `entidad`,
         `estatus_loc`) en la base de la rebanada `s` (o en `"rn"` / `"ba"`)."""
-        from src.pipeline.derivadas import DIMENSIONES
-        return DIMENSIONES[self._frame(s)][dimension]
+        from src.pipeline.derivadas import columna_dimension
+        return columna_dimension(self._frame(s), dimension)
 
     def columna_bandera(self, s, token: str) -> str:
         """Nombre de la columna guardada de la bandera `token` en la base de `s`."""

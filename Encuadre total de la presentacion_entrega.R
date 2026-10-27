@@ -64,7 +64,6 @@ Base_maestra_fin <- read_parquet(RUTA$base_total) %>%
     )
   )
 
-openxlsx::write.xlsx(Base_maestra_fin,"/Users/alberto/Documents/Base_maestra_fin.xlsx")
 
 
 #-----Diapositiva 1 ------
@@ -609,11 +608,31 @@ con_carpeta_FIN_O_16 <- Desaparecidas %>%
                portal ~ "Portal",
                TRUE ~ "Sin clasificar"
              )) %>% 
+  group_by( institucion,estado_final_nuevo) %>% count()
+
+
+con_carpeta_FIN_O_16_ori <- Desaparecidas %>% 
+  mutate(
+    fecha_periodo = as.Date(fecha_hechos_modificada_derivada_rnpdno),
+    tiene_match = coalesce(in_banci_derivada_rnpdno_banci, FALSE),
+    folio_valido = coalesce(is_cfval_derivada_rnpdno, FALSE),
+    forzada = coalesce(is_dfor_derivada_rnpdno_banci, FALSE),
+    particulares = coalesce(is_cpar_derivada_rnpdno_banci, FALSE),
+    campo_vacio = coalesce(is_cfvac_derivada_rnpdno, FALSE),
+    fiscalia = coalesce(is_fis_derivada_rnpdno_banci, FALSE),
+    comision = coalesce(is_com_derivada_rnpdno_banci, FALSE),
+    portal = coalesce(is_por_derivada_rnpdno_banci, FALSE)) %>% filter(!tiene_match==TRUE & folio_valido==TRUE) %>%   
+  mutate(Fecha=format(fecha_periodo, "%Y-%m"),
+         institucion = case_when(
+           fiscalia ~ "Fiscalía",
+           comision ~ "Comisión",
+           portal ~ "Portal",
+           TRUE ~ "Sin clasificar"
+         )) %>% 
   group_by( institucion,nombre_entidad_derivada_rnpdno) %>% count()
 
 
-
-
+Desaparecidas$nombre_entidad_derivada_rnpdno
 
 
 

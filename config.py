@@ -360,7 +360,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-10-19.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-10-26.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -1004,6 +1004,10 @@ RNPDNO_COLUMN_MAPPING = {
 #
 # `src/pipeline/carga.py` aborta con un mensaje explícito si detecta que está activa.
 ESTADO = None
+
+# True: las presentaciones filtran y rotulan con el estado extraído de la dependencia.
+# False: conservan la entidad basada directamente en idestado del RNPDNO.
+USAR_ESTADO_EXTRAIDO_EN_PRESENTACIONES = True
 
 # Relación entre la clave de la entidad (dos dígitos numéricos) y el nombre de la entidad de forma correcta
 # Obtenidos del catalogo_municipios_inegi.csv

@@ -29,7 +29,7 @@ from src.settings import Settings
 # columnas conservadas o la lógica de derivación: entra en `clave_universo`. El
 # caché no depende de que se suba: su llave ya incluye el código de la capa
 # (`huella.huella_codigo`).
-VERSION_DERIVADAS = 25
+VERSION_DERIVADAS = 27
 
 # ── Columnas conservadas en el universo ──────────────────────────────────────
 # Todo lo que no esté aquí (ni sea una bandera is_*) se descarta: las columnas
@@ -75,6 +75,7 @@ CATEGORICAS = [
     "sexo_rnpdno", "sexo_banci", "clasificacion_des_derivada_rnpdno",
     "estatus_loc_derivada_rnpdno", "estatus_loc_derivada_banci",
     "nombre_entidad_derivada_rnpdno", "nombre_entidad_derivada_banci",
+    "estado_final_nuevo",
     "dependencia_origen_derivada_rnpdno_banci", "dependencia_origen_rnpdno",
     "tipo_match_derivada_rnpdno_banci",
     "localizado_o_no_localizado_derivada_banci",
@@ -111,6 +112,19 @@ DIMENSIONES = {
            "estatus_loc": "estatus_loc_derivada_banci"},
 }
 
+
+def columna_dimension(nombre_frame: str, dimension: str) -> str:
+    """Resuelve la columna de entidad según el interruptor de presentación actual."""
+    if nombre_frame == "rn" and config.USAR_ESTADO_EXTRAIDO_EN_PRESENTACIONES:
+        columnas_estado_extraido = {
+            "cve_ent": "idestado_final_nuevo",
+            "entidad": "estado_final_nuevo",
+        }
+        if dimension in columnas_estado_extraido:
+            return columnas_estado_extraido[dimension]
+    return DIMENSIONES[nombre_frame][dimension]
+
+
 # Banderas que ya vienen calculadas del ETL: el rebanado las lee en su columna
 # en vez de copiarlas a una `is_*`.
 BANDERAS_ETL = {
@@ -124,6 +138,52 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).upper().strip()
 
 
+def _normalizar_nombre_estado(texto: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", " ", _norm(texto)).strip()
+
+
+_ALIAS_ESTADO_ID = {
+    _normalizar_nombre_estado(nombre): id_estado
+    for id_estado, nombre in config.ENTIDADES.items()
+    if 1 <= id_estado <= 32
+}
+_ALIAS_ESTADO_ID.update({
+    "ESTADO DE MEXICO": 15,
+    "EDOMEX": 15,
+    "CIUDAD DE MEXICO": 9,
+    "CDMX": 9,
+    "DISTRITO FEDERAL": 9,
+    "D F": 9,
+    "COAHUILA DE ZARAGOZA": 5,
+    "MICHOACAN DE OCAMPO": 16,
+    "VERACRUZ DE IGNACIO DE LA LLAVE": 30,
+})
+_ESTADO_FINAL_RE = re.compile(
+    r"(?:^| )(" + "|".join(
+        re.escape(alias)
+        for alias in sorted(_ALIAS_ESTADO_ID, key=len, reverse=True)
+    ) + r")$"
+)
+
+
+def _resolver_estado_extraido(
+    dependencia: pd.Series, idestado: pd.Series
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Devuelve estado final, coincidencia textual y respaldo por ID."""
+    dependencia_norm = dependencia.astype("string").fillna("").map(
+        _normalizar_nombre_estado
+    )
+    alias_final = dependencia_norm.str.extract(_ESTADO_FINAL_RE, expand=False)
+    id_texto = alias_final.map(_ALIAS_ESTADO_ID)
+    estado_texto = id_texto.map(config.ENTIDADES).astype("object")
+
+    ids = pd.to_numeric(idestado, errors="coerce")
+    ids_validos = ids.where(ids.between(1, 32) & ids.mod(1).eq(0))
+    estado_id = ids_validos.astype("Int64").map(config.ENTIDADES).astype("object")
+
+    return estado_texto.combine_first(estado_id), estado_texto, estado_id
+
+
 # Nombre normalizado de entidad → clave INEGI, con los alias que usa BANCI.
 _MAPA_ENTIDAD = {_norm(v): k for k, v in config.ENTIDADES.items()}
 _MAPA_ENTIDAD.update({
@@ -132,6 +192,11 @@ _MAPA_ENTIDAD.update({
     "COAHUILA DE ZARAGOZA": 5, "MICHOACAN DE OCAMPO": 16,
     "VERACRUZ DE IGNACIO DE LA LLAVE": 30,
 })
+
+
+def _id_estado_extraido(estado: pd.Series) -> pd.Series:
+    estado_norm = estado.astype("string").map(_normalizar_nombre_estado)
+    return estado_norm.map(_MAPA_ENTIDAD).astype("Int8")
 
 
 def columna_bandera(df: pd.DataFrame, token: str) -> str:
@@ -211,6 +276,79 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
     # La clave es `idestado_derivada_rnpdno`, que ya viaja en COLS_RN: no se copia.
     cve = pd.to_numeric(rn["idestado_derivada_rnpdno"], errors="coerce").astype("Int8")
     out["nombre_entidad_derivada_rnpdno"] = cve.map(config.ENTIDADES)
+
+    col_dependencia_estado = _primera(
+        rn,
+        ["dependencia_origen_derivada_rnpdno_banci", "dependencia_origen_rnpdno"],
+    )
+    dependencia_estado = (
+        rn[col_dependencia_estado]
+        if col_dependencia_estado is not None
+        else pd.Series(pd.NA, index=rn.index, dtype="object")
+    )
+    if (
+        col_dependencia_estado == "dependencia_origen_derivada_rnpdno_banci"
+        and "dependencia_origen_rnpdno" in rn.columns
+    ):
+        dependencia_estado = dependencia_estado.astype("string")
+        dependencia_original = rn["dependencia_origen_rnpdno"].astype("string")
+        dependencia_no_vacia = (
+            dependencia_estado.str.strip().ne("").fillna(False)
+        )
+        dependencia_estado = dependencia_estado.where(
+            dependencia_no_vacia, dependencia_original
+        )
+
+    col_idestado = _primera(rn, ["idestado_derivada_rnpdno", "idestado"])
+    ids_estado = (
+        rn[col_idestado]
+        if col_idestado is not None
+        else pd.Series(pd.NA, index=rn.index, dtype="object")
+    )
+    estado_final, estado_texto, estado_respaldo = _resolver_estado_extraido(
+        dependencia_estado, ids_estado
+    )
+    out["estado_final_nuevo"] = estado_final
+    out["idestado_final_nuevo"] = _id_estado_extraido(estado_final)
+
+    if verbose:
+        total = len(rn)
+        desde_texto = int(estado_texto.notna().sum())
+        desde_respaldo = int((estado_texto.isna() & estado_respaldo.notna()).sum())
+        sin_resolver = int(estado_final.isna().sum())
+        inconsistente = (
+            estado_texto.notna()
+            & estado_respaldo.notna()
+            & estado_texto.ne(estado_respaldo)
+        )
+
+        def porcentaje(cantidad: int) -> float:
+            return 100 * cantidad / total if total else 0.0
+
+        print(
+            "  Estado extraído: "
+            f"texto {desde_texto:,} ({porcentaje(desde_texto):.1f}%), "
+            f"respaldo idestado {desde_respaldo:,} ({porcentaje(desde_respaldo):.1f}%), "
+            f"sin resolver {sin_resolver:,} ({porcentaje(sin_resolver):.1f}%)."
+        )
+        print("  Distribución final por estado:")
+        print(
+            estado_final.value_counts(dropna=False, sort=False)
+            .rename_axis("estado_final_nuevo")
+            .rename("registros")
+            .to_string()
+        )
+        if inconsistente.any():
+            print(
+                f"  ⚠️ Estado de dependencia distinto a idestado en "
+                f"{int(inconsistente.sum()):,} registros; se conserva el estado del texto."
+            )
+            ejemplos = pd.DataFrame({
+                "dependencia": dependencia_estado,
+                "estado_texto": estado_texto,
+                "estado_id": estado_respaldo,
+            }).loc[inconsistente].head(5)
+            print(ejemplos.to_string(index=False))
 
     col_clasif = _primera(rn, ["clasificacion_des_derivada_rnpdno", "clasificacion_des"])
     out["estatus_loc_derivada_rnpdno"] = rn[col_clasif].map(
