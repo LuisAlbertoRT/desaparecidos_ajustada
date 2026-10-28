@@ -539,9 +539,20 @@ con_carpeta_FIN_O_11 <- Desaparecidas %>% mutate(
 
 
 
+aun_no <- Desaparecidas %>% mutate(
+  fecha_periodo = as.Date(fecha_hechos_modificada_derivada_rnpdno),
+  tiene_match = coalesce(in_banci_derivada_rnpdno_banci, FALSE),
+  folio_valido = coalesce(is_cfval_derivada_rnpdno, FALSE),
+  forzada = coalesce(is_dfor_derivada_rnpdno_banci, FALSE),
+  particulares = coalesce(is_cpar_derivada_rnpdno_banci, FALSE),
+  campo_vacio = coalesce(is_cfvac_derivada_rnpdno, FALSE)) %>%
+  filter(!tiene_match==TRUE & !folio_valido==TRUE) %>% 
+  mutate(Fecha=format(fecha_periodo, "%Y-%m")) %>% 
+ dplyr::filter(Fecha==("2026-08"))
 
+
+write_excel_csv(aun_no,paste(RAIZ,"/Faltantedeagosto2.csv",sep = ""))
 # ----Lamina 12  ----
-
 
 con_carpeta_FIN_O_12 <- Desaparecidas %>% mutate(
   fecha_periodo = as.Date(fecha_hechos_modificada_derivada_rnpdno),
@@ -555,6 +566,18 @@ con_carpeta_FIN_O_12 <- Desaparecidas %>% mutate(
 
 
 
+con_carpeta_FIN_O_12_no <- Desaparecidas %>% mutate(
+  fecha_periodo = as.Date(fecha_hechos_modificada_derivada_rnpdno),
+  tiene_match = coalesce(in_banci_derivada_rnpdno_banci, FALSE),
+  folio_valido = coalesce(is_cfval_derivada_rnpdno, FALSE),
+  forzada = coalesce(is_dfor_derivada_rnpdno_banci, FALSE),
+  particulares = coalesce(is_cpar_derivada_rnpdno_banci, FALSE),
+  campo_vacio = coalesce(is_cfvac_derivada_rnpdno, FALSE)
+) %>%   filter(!tiene_match==TRUE & !folio_valido&!campo_vacio==TRUE) %>% mutate(Fecha=format(fecha_periodo, "%Y-%m")) %>% 
+  dplyr::filter(Fecha==("2026-08"))
+
+
+Desaparecidas
 
 # ----Lamina 13  ----
 
@@ -732,7 +755,7 @@ con_carpeta_FIN_O_19 <- Desaparecidas %>%
 
 
 
-# ----Lamina 20  ---
+#------- Lamina 20 -- ---
 ruta_parquet <- RUTA$base_total
 ruta_directorio <- RUTA$directorio_indicios
 

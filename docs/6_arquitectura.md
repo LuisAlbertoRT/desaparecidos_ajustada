@@ -193,6 +193,9 @@ Un FUB que aparece en dos archivos cuenta una vez.
 La implementación es única —`src.cleaning.clasificar_carpeta`— y la usa la CAPA B
 (`derivadas.py`) sobre `expedientes_rnpdno`. El perfil hereda la modalidad de `config.py`;
 sólo se sobrescribe en `perfiles/*.toml` si un reporte concreto necesita otra.
+Antes de aplicar el patrón, se recortan los espacios de los extremos y cada secuencia
+de espacios internos se reduce a uno; esto evita rechazar folios válidos por espacios
+duplicados capturados en el expediente.
 
 Antes el ETL y la carga también marcaban una indicadora de carpeta
 (`indicadora_carpeta_derivada_rnpdno`, `indicadora_carpeta`) con su subfiltro

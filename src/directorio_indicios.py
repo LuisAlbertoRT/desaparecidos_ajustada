@@ -10,6 +10,8 @@ del caché (`huella.RAICES`) y editarlo obliga a repetir el matching. Nada del
 pipeline importa este módulo: tocarlo no invalida el caché.
 """
 
+import pandas as pd
+
 import config
 from src.validacion import leer_excel, resolver_columnas
 
@@ -60,6 +62,8 @@ def indicios_formalizados(comprimido, verbose: bool = True):
         - `total_32` : formalizados en las 32 entidades federativas, o sea
                        `nacional` sin lo que no es una entidad ("Nacido en el
                        extranjero"); alimenta el marcador `_v4`.
+        - `sin_estado`: registros localizados sin entidad federativa de
+                        desaparición, que se excluyen del desglose por entidad.
     """
     directorio = leer_excel(
         config.DIRECTORIO_INDICIOS_FILE,
@@ -82,14 +86,23 @@ def indicios_formalizados(comprimido, verbose: bool = True):
 
     d = directorio.copy()
     d["fub"] = d["fub"].astype(str).str.upper()
+    estado = d["estado_de_desaparicion"]
+    estado_texto = estado.astype("string").str.strip().str.replace(
+        r"\s+", " ", regex=True
+    )
+    sin_estado_mask = (
+        estado.isna()
+        | pd.to_numeric(estado_texto, errors="coerce").eq(33).fillna(False)
+        | estado_texto.str.casefold().eq("nacido en el extranjero").fillna(False)
+    )
     d["estado_de_desaparicion"] = (
-        d["estado_de_desaparicion"]
-        .fillna(config.DIRECTORIO_INDICIOS_SIN_ESTADO)
+        estado.mask(sin_estado_mask, config.DIRECTORIO_INDICIOS_SIN_ESTADO)
         .replace(config.DIRECTORIO_INDICIOS_RENOMBRES)
     )
     d = d.merge(clas, on="fub", how="left")
 
     es_loc = d["clasificacion_des"].isin(config.DIRECTORIO_INDICIOS_CLASIF_LOCALIZADO)
+    sin_estado = int((sin_estado_mask & es_loc).sum())
     # Un FUB que no cruza sigue contando como desaparecido: no hay evidencia de
     # localización, y descartarlo inflaría el porcentaje de formalizados.
     es_des = (d["clasificacion_des"].isin(config.DIRECTORIO_INDICIOS_CLASIF_DESAPARECIDO)
@@ -172,4 +185,4 @@ def indicios_formalizados(comprimido, verbose: bool = True):
 
     return tabulado, tabulado_32, {"total": total, "universo": universo,
                                    "pct": pct, "nacional": nacional, "resto": resto,
-                                   "total_32": total_32}
+                                   "total_32": total_32, "sin_estado": sin_estado}

@@ -358,7 +358,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-10-26.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-10-27.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -576,6 +576,8 @@ PPT_DIARIO_FILE = ppt_diario_file()
 #                                         federativas (sin "Nacido en el
 #                                         extranjero"); las 32 salen de ENTIDADES
 #     {{gr_32ent_rn_24jun26-max_loc_fmz}} desglose por entidad de esas 32
+#     {{reg_rn_24jun26-max_loc_fmz_sisf}} registros sin entidad de desaparición,
+#                                         excluidos del desglose por entidad
 # Los calcula `src.directorio_indicios.indicios_formalizados`.
 DIRECTORIO_INDICIOS_DIR = INPUT_DIR / "domicilios_y_numeros_contacto"
 DIRECTORIO_INDICIOS_FILE = (
@@ -585,7 +587,7 @@ DIRECTORIO_INDICIOS_FILE = (
 DIRECTORIO_INDICIOS_SHEET = 0
 
 # Fecha del corte, en el formato que usan los marcadores. Si cambia el archivo,
-# cambia también aquí y los cuatro marcadores se renombran solos.
+# cambia también aquí y los marcadores se renombran solos.
 DIRECTORIO_INDICIOS_CORTE = "24jun26"
 
 # Sólo estas dos columnas se usan del archivo (trae 37).

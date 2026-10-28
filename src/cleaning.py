@@ -362,9 +362,10 @@ def clasificar_carpeta(expediente: pd.Series,
     if modalidad is None:
         modalidad = getattr(config, "MODALIDAD_CLASIFICACION_CARPETA", 1)
 
-    # strip() es imprescindible: los patrones del catálogo están anclados con ^...$,
-    # así que un espacio al inicio o al final hace fallar el match de un folio válido.
-    exp = expediente.fillna("").astype(str).str.strip().str.upper()
+    # Los patrones están anclados con ^...$; quita espacios de borde y reduce los
+    # espacios internos repetidos, que aparecen en folios válidos capturados.
+    exp = (expediente.fillna("").astype(str).str.strip()
+           .str.replace(r"\s+", " ", regex=True).str.upper())
 
     if modalidad == 1:
         return exp.str.contains(normalizar_regex(config.RNPDNO_REGEX_CARPETA),
