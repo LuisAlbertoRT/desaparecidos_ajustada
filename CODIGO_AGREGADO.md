@@ -1,24 +1,26 @@
 # 📝 Código Agregado - Detalles Técnicos
 
-## Funciones Agregadas en Celda 15
+La implementación está en [notebooks/6_PPT_Reporte_Diario.ipynb](./notebooks/6_PPT_Reporte_Diario.ipynb), no en `notebooks luis/`.
+
+## Funciones Agregadas en la nueva celda de gráficas
 
 ### 1️⃣ `fecha_max_banci()`
 
 ```python
 def fecha_max_banci():
-    """Obtiene la última fecha reportada en BANCI."""
-    if "reg_rn-si-ba_01oct24-max_des" in dfs:
-        df_banci = dfs["reg_rn-si-ba_01oct24-max_des"]
-        if "fha_de_hchos_derivada_banci" in df_banci.columns:
-            fecha_max = pd.to_datetime(df_banci["fha_de_hchos_derivada_banci"]).max()
-            return fecha_max
-    return None
+    """Obtiene la fecha máxima de hechos de la base completa de BANCI."""
+    columna_fecha = u.columna("ba", "fecha")
+    fechas = pd.to_datetime(u.ba[columna_fecha], errors="coerce")
+    fecha_max = fechas.max()
+    if pd.isna(fecha_max):
+        raise ValueError(f"No hay fechas válidas en BANCI ({columna_fecha}).")
+    return fecha_max
 ```
 
 **¿Qué hace?**
-- Busca la rebanada de BANCI (`reg_rn-si-ba_01oct24-max_des`)
-- Obtiene el máximo de la columna de fecha `fha_de_hchos_derivada_banci`
-- Retorna un `pd.Timestamp` o `None` si no encuentra datos
+- Obtiene la columna de fecha de la base original completa de BANCI.
+- Retorna su fecha máxima como `pd.Timestamp`.
+- Falla explícitamente si BANCI no contiene fechas válidas.
 
 **Ejemplo de salida:**
 ```
@@ -27,32 +29,23 @@ Timestamp('2026-09-30 00:00:00')
 
 ---
 
-### 2️⃣ `serie_mensual_hasta_banci(s, fecha_limite=None)`
+### 2️⃣ `serie_mensual_hasta_banci(s, fecha_limite)`
 
 ```python
-def serie_mensual_hasta_banci(s, fecha_limite=None):
-    """Registros por mes de una rebanada, limitados a la fecha de BANCI.
-    
-    Si no se proporciona fecha_limite, se obtiene de BANCI automáticamente.
-    """
-    if fecha_limite is None:
-        fecha_limite = fecha_max_banci()
-    
-    desde, hasta = u.rango_fechas(s)
-    
-    # Limitar hasta la fecha de BANCI
-    if fecha_limite is not None:
-        hasta = min(pd.to_datetime(hasta), fecha_limite)
-    
-    resultado = agrupar_por_mes(u.slice(s), u.columna(s, "fecha"), completar_meses=True,
-                                desde=desde, hasta=hasta)
-    return resultado
+desde, hasta = u.rango_fechas(s)
+columna_fecha = u.columna(s, "fecha")
+df = u.slice(s)
+fechas = pd.to_datetime(df[columna_fecha], errors="coerce")
+df = df.loc[fechas.notna() & fechas.le(fecha_limite)]
+hasta = min(pd.to_datetime(hasta), pd.to_datetime(fecha_limite))
+tabla = agrupar_por_mes(df, columna_fecha, completar_meses=True,
+                        desde=desde, hasta=hasta)
 ```
 
 **¿Qué hace?**
 - Es una versión mejorada de `serie_mensual()` que limita los datos
 - Si no se proporciona `fecha_limite`, la obtiene automáticamente de BANCI
-- Limita la fecha "hasta" al mínimo entre la fecha del período y la fecha de BANCI
+- Excluye del conteo los registros posteriores a BANCI y limita el eje mensual
 - Retorna una tabla con columnas: `['mes', 'registros']`
 
 **Ejemplo de uso:**
@@ -63,90 +56,42 @@ tabla = serie_mensual_hasta_banci(
 # Retorna DataFrame con registros solo hasta septiembre 2026
 ```
 
-**Ejemplo de salida:**
+**Resultado actual:** la gráfica de la diapositiva 10 conserva 7,882 registros
+distribuidos de octubre de 2024 a septiembre de 2026 (24 meses). Esto no cambia el
+total de la diapositiva, que sigue calculándose aparte.
+
+**Forma de la tabla:**
 ```
          mes  registros
-0  2024-10     1,234
-1  2024-11       987
-2  2024-12     1,456
-3  2025-01     2,345
-4  2025-02     1,876
-5  2025-03     2,543
+0  2024-10       ...
+1  2024-11       ...
+2  2024-12       ...
+3  2025-01       ...
+4  2025-02       ...
+5  2025-03       ...
 ...
-47 2026-09     3,123
-# (octubre y noviembre 2026 no aparecen porque están después de BANCI)
+23 2026-09       ...
 ```
 
 ---
 
-### 3️⃣ `generar_mensaje_fechas_no_contempladas(s, fecha_limite=None)`
+### 3️⃣ `generar_mensaje_fechas_no_contempladas(s, fecha_limite)`
 
 ```python
-def generar_mensaje_fechas_no_contempladas(s, fecha_limite=None):
-    """Genera mensaje de meses no contemplados por falta de datos BANCI.
-    
-    Devuelve una cadena como:
-    "No se muestran 123 casos de octubre y 456 correspondientes a noviembre 
-    ya que están por ser verificados con BANCI"
-    """
-    if fecha_limite is None:
-        fecha_limite = fecha_max_banci()
-    
-    if fecha_limite is None:
-        return ""
-    
-    # Obtener el rango completo del período
-    desde, hasta = u.rango_fechas(s)
-    hasta_periodo = pd.to_datetime(hasta)
-    fecha_limite = pd.to_datetime(fecha_limite)
-    
-    # Si la fecha de BANCI es la última del período, no hay meses no contemplados
-    if fecha_limite >= hasta_periodo:
-        return ""
-    
-    # Obtener todos los registros de la rebanada
-    df_slice = u.slice(s)
-    df_slice["mes"] = pd.to_datetime(df_slice[u.columna(s, "fecha")]).dt.to_period("M")
-    
-    # Contar registros por mes después de la fecha de BANCI
-    meses_no_cont = df_slice[pd.to_datetime(df_slice[u.columna(s, "fecha")]) > fecha_limite]
-    conteo_por_mes = meses_no_cont.groupby("mes").size().sort_index()
-    
-    if len(conteo_por_mes) == 0:
-        return ""
-    
-    # Construir el mensaje
-    meses_etiquetados = []
-    for mes, conteo in conteo_por_mes.items():
-        mes_str = mes.strftime("%B").lower()  # nombre del mes en inglés
-        # Traducir meses al español
-        mes_es = {
-            "january": "enero", "february": "febrero", "march": "marzo",
-            "april": "abril", "may": "mayo", "june": "junio",
-            "july": "julio", "august": "agosto", "september": "septiembre",
-            "october": "octubre", "november": "noviembre", "december": "diciembre"
-        }.get(mes_str, mes_str)
-        meses_etiquetados.append(f"{conteo:,} casos de {mes_es}")
-    
-    # Unir los meses con "y"
-    if len(meses_etiquetados) == 1:
-        meses_texto = meses_etiquetados[0]
-        return f"No se muestran {meses_texto} ya que están por ser verificados con BANCI"
-    else:
-        meses_texto = " y ".join(meses_etiquetados)
-        return f"No se muestran {meses_texto} ya que están por ser verificados con BANCI"
+mensaje = generar_mensaje_fechas_no_contempladas(
+    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"),
+    fecha_limite=FECHA_MAX_BANCI,
+)
 ```
 
 **¿Qué hace?**
-- Obtiene todos los registros después de la fecha de BANCI
-- Agrupa por mes y cuenta los casos
-- Traduce automáticamente los nombres de meses al español
-- Formatea el mensaje con separadores de miles
+- Cuenta, por mes, los casos `cfval` posteriores a BANCI en la diapositiva 10.
+- Traduce los nombres de los meses al español y formatea las cantidades.
 - Retorna un string vacío si no hay meses sin contemplar
 
-**Ejemplo de salida 1** (con datos sin verificar):
+**Salida actual:**
 ```
-"No se muestran 1,234 casos de octubre y 5,678 correspondientes a noviembre 
+"No se muestran 479 casos de octubre y 42 correspondientes a noviembre
 ya que están por ser verificados con BANCI"
 ```
 
@@ -155,14 +100,9 @@ ya que están por ser verificados con BANCI"
 ""  # cadena vacía
 ```
 
-**Ejemplo de salida 3** (solo un mes):
-```
-"No se muestran 2,456 casos de octubre ya que están por ser verificados con BANCI"
-```
-
 ---
 
-## Inicialización Global (al inicio de Celda 15)
+## Inicialización Global
 
 ```python
 # Calcular las variables globales
@@ -177,9 +117,25 @@ print(f"📅 Fecha máxima en BANCI: {FECHA_MAX_BANCI}")
 
 ---
 
-## Modificaciones en Gráficos (Celda 15)
+## Gráficos
 
-### Slide 9 - Con folio válido (`cfval`)
+### Diapositiva 9 - Con match en BANCI (`rn-si-ba`)
+
+**ANTES:**
+```python
+nombre = "gr_mes_rn-si-ba_01oct24-max_des"
+tabla = serie_mensual(
+    Slice("rn-si-ba", "01oct24-max", estatus="des"))
+```
+
+**DESPUÉS:**
+```python
+nombre = "gr_mes_rn-si-ba_01oct24-max_des"
+tabla = serie_mensual_hasta_banci(
+    Slice("rn-si-ba", "01oct24-max", estatus="des"))
+```
+
+### Diapositiva 10 - Sin match en BANCI, con folio válido (`cfval`)
 
 **ANTES:**
 ```python
@@ -195,32 +151,19 @@ tabla = serie_mensual_hasta_banci(
     Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"))
 ```
 
-### Slide 10 - Sin folio válido (`sfval`)
-
-**ANTES:**
-```python
-nombre = "gr_mes_rn-no-ba_01oct24-max_des_sfval"
-tabla = serie_mensual(
-    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="sfval"))
-```
-
-**DESPUÉS:**
-```python
-nombre = "gr_mes_rn-no-ba_01oct24-max_des_sfval"
-tabla = serie_mensual_hasta_banci(
-    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="sfval"))
-```
+Estos filtros solo cambian la tabla que se dibuja en cada PNG. No alteran `vars_ppt` ni los totales `{{reg_rn-si-ba_01oct24-max_des}}` y `{{reg_rn-no-ba_01oct24-max_des_cfval}}`.
 
 ---
 
-## Nueva Variable de Plantilla (Celda 11)
+## Variable de Plantilla
 
-**AGREGADO EN el diccionario `extra={}` de `u.indicadores()`:**
+El mensaje cuenta los registros `cfval` posteriores a la fecha máxima de BANCI y se agrega a `vars_ppt` justo antes de renderizar:
 
 ```python
-# Mensaje de fechas no contempladas para slides 9 y 10
-"msg_fechas_no_cont": generar_mensaje_fechas_no_contempladas(
-    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="sfval")),
+vars_ppt["msg_fechas_no_cont"] = generar_mensaje_fechas_no_contempladas(
+    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"),
+    fecha_limite=FECHA_MAX_BANCI,
+)
 ```
 
 **Uso en la plantilla:**
@@ -233,27 +176,27 @@ tabla = serie_mensual_hasta_banci(
 ## Flujo de Ejecución
 
 ```
-1. Se carga FECHA_MAX_BANCI = fecha_max_banci()
+1. Se carga FECHA_MAX_BANCI desde la base completa de BANCI
    ↓
    Imprime: "📅 Fecha máxima en BANCI: 2026-09-30"
    
-2. Se genera gráfico Slide 9 con serie_mensual_hasta_banci()
+2. Se regenera solo el PNG de la diapositiva 9 con serie_mensual_hasta_banci()
    ↓
    Datos: octubre 2024 a septiembre 2026
    
-3. Se genera gráfico Slide 10 con serie_mensual_hasta_banci()
+3. Se regenera solo el PNG de la diapositiva 10 con serie_mensual_hasta_banci()
    ↓
    Datos: octubre 2024 a septiembre 2026
    
-4. Se genera msg_fechas_no_cont con generar_mensaje_fechas_no_contempladas()
+4. Se agrega msg_fechas_no_cont a vars_ppt
    ↓
-   Retorna: "No se muestran 1,234 casos de octubre y 5,678 correspondientes a noviembre..."
+   Retorna: "No se muestran 479 casos de octubre y 42 correspondientes a noviembre..."
    
 5. Las variables se pasan a PPTReportBuilder
    ↓
    Se reemplaza {{msg_fechas_no_cont}} en la plantilla
    
-6. Se genera la presentación con gráficos cortos y mensaje dinámico
+6. Se genera la presentación con los dos PNG recortados y mensaje dinámico; los totales originales se conservan
 ```
 
 ---
@@ -306,9 +249,9 @@ resultado = serie_mensual_hasta_banci(
 ### Obtener el mensaje para otra rebanada:
 
 ```python
-# Generar mensaje para cfval en lugar de sfval
+# Generar el mensaje para otra rebanada
 mensaje = generar_mensaje_fechas_no_contempladas(
-    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval")  # ← Otra rebanada
+    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"),
+    fecha_limite=FECHA_MAX_BANCI,
 )
 ```
-

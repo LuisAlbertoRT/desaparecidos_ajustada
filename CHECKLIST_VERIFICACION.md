@@ -8,28 +8,28 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 
 - [ ] **Notebook modificado correctamente**
   ```bash
-  grep -c "def fecha_max_banci()" ./notebooks\ luis/6_PPT_Reporte_Diario.ipynb
+  grep -c "def fecha_max_banci()" notebooks/6_PPT_Reporte_Diario.ipynb
   # Debe retornar: 1
   ```
 
 - [ ] **Todas las funciones presentes**
   ```bash
-  grep -c "def serie_mensual_hasta_banci(" ./notebooks\ luis/6_PPT_Reporte_Diario.ipynb
+  grep -c "def serie_mensual_hasta_banci(" notebooks/6_PPT_Reporte_Diario.ipynb
   # Debe retornar: 1
   
-  grep -c "def generar_mensaje_fechas_no_contempladas(" ./notebooks\ luis/6_PPT_Reporte_Diario.ipynb
+  grep -c "def generar_mensaje_fechas_no_contempladas(" notebooks/6_PPT_Reporte_Diario.ipynb
   # Debe retornar: 1
   ```
 
 - [ ] **Gráficos modificados**
   ```bash
-  grep -c "serie_mensual_hasta_banci(" ./notebooks\ luis/6_PPT_Reporte_Diario.ipynb
-  # Debe retornar: 2 (uno para cfval, otro para sfval)
+  grep -c "serie_mensual_hasta_banci(" notebooks/6_PPT_Reporte_Diario.ipynb
+  # Debe retornar: 2 (gráficas de diapositivas 9 y 10)
   ```
 
 - [ ] **Variable de plantilla agregada**
   ```bash
-  grep -c "msg_fechas_no_cont" ./notebooks\ luis/6_PPT_Reporte_Diario.ipynb
+  grep -c "msg_fechas_no_cont" notebooks/6_PPT_Reporte_Diario.ipynb
   # Debe retornar: 1
   ```
 
@@ -37,7 +37,7 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 
 - [ ] **Ejecutar notebook sin errores**
   - Abre Jupyter Notebook
-  - Ejecuta `./notebooks luis/6_PPT_Reporte_Diario.ipynb`
+  - Abre y ejecuta `notebooks/6_PPT_Reporte_Diario.ipynb`
   - Verifica que no haya errores en la salida
 
 - [ ] **Verificar fecha BANCI en salida**
@@ -47,15 +47,19 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 
 ### Fase 3: Verificación de Gráficos
 
-- [ ] **Gráfico Slide 9 (cfval) se corta correctamente**
+- [ ] **Gráfico Slide 9 (`rn-si-ba`) se corta correctamente**
   - El gráfico debe mostrar datos desde octubre 2024 hasta septiembre 2026
   - No debe haber datos de octubre o noviembre 2026
-  - La última barra debe ser septiembre 2026
+  - El eje termina en septiembre 2026
 
-- [ ] **Gráfico Slide 10 (sfval) se corta correctamente**
+- [ ] **Gráfico Slide 10 (`rn-no-ba`, `cfval`) se corta correctamente**
   - El gráfico debe mostrar datos desde octubre 2024 hasta septiembre 2026
   - No debe haber datos de octubre o noviembre 2026
-  - La última barra debe ser septiembre 2026
+  - El eje termina en septiembre 2026
+  - El total `{{reg_rn-no-ba_01oct24-max_des_cfval}}` no cambia
+
+- [ ] **Total de la diapositiva 9 no cambia**
+  - `{{reg_rn-si-ba_01oct24-max_des}}` conserva su valor original
 
 ### Fase 4: Verificación de Mensaje
 
@@ -77,7 +81,7 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 ### Fase 5: Verificación de Escalabilidad
 
 - [ ] **Cambiar período de prueba**
-  - Edita celda 6: cambia `"01oct24-max"` a `"01ene25-max"`
+  - En el bloque nuevo de gráficas, cambia el período de las dos `Slice` de `"01oct24-max"` a `"01ene25-max"`
   - Ejecuta el notebook
   - Verifica que la fecha máxima se actualice
   - Verifica que los gráficos muestren el nuevo período
@@ -138,8 +142,8 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 ### En el Notebook:
 ```
 📅 Fecha máxima en BANCI: 2026-09-30
-  📊 gr_mes_rn-no-ba_01oct24-max_des_cfval: 24,567 registros en 12 filas
-  📊 gr_mes_rn-no-ba_01oct24-max_des_sfval: 54,321 registros en 12 filas
+  📊 gr_mes_rn-si-ba_01oct24-max_des: 7,042 registros en 24 meses
+  📊 gr_mes_rn-no-ba_01oct24-max_des_cfval: 7,882 registros en 24 meses
 ```
 
 ### En los Gráficos (PNG):
@@ -150,9 +154,9 @@ Utiliza este checklist para verificar que todo está funcionando correctamente.
 ### En PowerPoint:
 **Slide 10:**
 ```
-[Gráfico de sfval corto hasta septiembre 2026]
+[Gráfico de cfval corto hasta septiembre 2026]
 
-No se muestran 2,456 casos de octubre y 1,234 correspondientes 
+No se muestran 479 casos de octubre y 42 correspondientes
 a noviembre ya que están por ser verificados con BANCI
 ```
 
@@ -161,6 +165,7 @@ a noviembre ya que están por ser verificados con BANCI
 ## ✨ Criterios de Aceptación
 
 ✅ **Gráficos de Slide 9 y 10 se cortan automáticamente en fecha BANCI**
+✅ **Los totales de ambas diapositivas se conservan**
 ✅ **Mensaje dinámico {{msg_fechas_no_cont}} aparece en Slide 10**
 ✅ **Mensaje contiene meses sin verificar con conteo de casos**
 ✅ **Formato: "No se muestran X casos de MES y Y casos de MES..."**
@@ -179,4 +184,3 @@ Si encuentras algún problema no listado aquí:
 2. Revisa `CODIGO_AGREGADO.md` para detalles técnicos
 3. Verifica `DIAGRAMA_FLUJO.txt` para entender el flujo
 4. Contacta al equipo de desarrollo
-

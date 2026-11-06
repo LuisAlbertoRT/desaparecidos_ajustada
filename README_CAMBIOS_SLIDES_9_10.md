@@ -19,17 +19,23 @@ Esta carpeta contiene la implementación completa del filtrado automático de gr
 
 ### ✅ Qué se Hizo
 
-1. **Agregadas 3 nuevas funciones** en el notebook (Celda 15):
+Los cambios están en **[notebooks/6_PPT_Reporte_Diario.ipynb](./notebooks/6_PPT_Reporte_Diario.ipynb)**. No se usa el notebook de `notebooks luis/`.
+
+1. **Agregadas 3 nuevas funciones** en el notebook (celda nueva después de la sección de gráficas):
    - `fecha_max_banci()` - Obtiene última fecha de BANCI
    - `serie_mensual_hasta_banci()` - Filtra datos hasta BANCI
    - `generar_mensaje_fechas_no_contempladas()` - Crea mensaje dinámico
 
-2. **Modificados los gráficos** (Celda 15):
-   - Slide 9 (cfval): usa `serie_mensual_hasta_banci()`
-   - Slide 10 (sfval): usa `serie_mensual_hasta_banci()`
+2. **Regenerados los gráficos**:
+   - Diapositiva 9 (`gr_mes_rn-si-ba_01oct24-max_des`)
+   - Diapositiva 10 (`gr_mes_rn-no-ba_01oct24-max_des_cfval`)
+   - Solo se reemplazan esas imágenes; los totales `{{reg_rn-si-ba_01oct24-max_des}}` y `{{reg_rn-no-ba_01oct24-max_des_cfval}}` no se recalculan ni modifican.
 
-3. **Agregada variable de plantilla** (Celda 11):
+3. **Agregada variable de plantilla** antes de generar el PPT:
    - `"msg_fechas_no_cont"` disponible como `{{msg_fechas_no_cont}}`
+   - La ejecución verifica que el marcador efectivamente se sustituya.
+
+Para aplicar los cambios, reinicia el kernel y ejecuta todas las celdas del notebook.
 
 ---
 
@@ -44,7 +50,7 @@ Esta carpeta contiene la implementación completa del filtrado automático de gr
 ```
 [Gráfico: Oct 2024 - Sep 2026]
 
-No se muestran 1,234 casos de octubre y 5,678 correspondientes 
+No se muestran 479 casos de octubre y 42 correspondientes
 a noviembre ya que están por ser verificados con BANCI
 ```
 
@@ -54,7 +60,7 @@ a noviembre ya que están por ser verificados con BANCI
 
 ### 1. Ejecutar el Notebook
 ```bash
-cd notebooks\ luis/
+cd notebooks
 jupyter notebook 6_PPT_Reporte_Diario.ipynb
 ```
 
@@ -180,4 +186,3 @@ git diff HEAD~1 HEAD
 **Estado:** ✅ Completado  
 **Autor:** Copilot  
 **Versión:** 1.0
-

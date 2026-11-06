@@ -6,19 +6,28 @@ Recortar automáticamente los gráficos de las **slides 9 y 10** hasta la últim
 
 ## ✅ Cambios Realizados
 
-### En el Notebook `6_PPT_Reporte_Diario.ipynb`:
+### En `notebooks/6_PPT_Reporte_Diario.ipynb`
 
-1. **Celda 15**: Se agregaron 3 nuevas funciones
+Los cambios deben ejecutarse desde el notebook de `notebooks/`, **nunca** desde `notebooks luis/`.
+
+1. **Celda nueva después de la sección de gráficas**: se agregaron 3 funciones
    - `fecha_max_banci()` → Obtiene la última fecha de BANCI
    - `serie_mensual_hasta_banci()` → Filtra series mensuales por fecha
    - `generar_mensaje_fechas_no_contempladas()` → Crea el mensaje dinámico
 
-2. **Celda 15**: Se modificaron las llamadas de gráficos
-   - Slide 9 (`cfval`): Ahora usa `serie_mensual_hasta_banci()`
-   - Slide 10 (`sfval`): Ahora usa `serie_mensual_hasta_banci()`
+2. **La misma celda nueva** regenera únicamente las imágenes de las diapositivas 9 y 10. Filtra las filas antes de agruparlas:
+   - Diapositiva 9: `gr_mes_rn-si-ba_01oct24-max_des`
+   - Diapositiva 10: `gr_mes_rn-no-ba_01oct24-max_des_cfval`
+   - No cambia los totales `{{reg_rn-si-ba_01oct24-max_des}}` ni `{{reg_rn-no-ba_01oct24-max_des_cfval}}`.
 
-3. **Celda 11**: Se agregó la variable de plantilla
-   - `"msg_fechas_no_cont"` disponible en `{{msg_fechas_no_cont}}`
+3. Antes de generar la presentación se agrega `"msg_fechas_no_cont"` a `vars_ppt` y se comprueba que la plantilla lo haya sustituido.
+   - El conteo corresponde a los casos de folio válido de la diapositiva 10 que quedan fuera del gráfico.
+
+## ▶️ Cómo ejecutar los cambios
+
+En VS Code/Jupyter, selecciona **Reiniciar kernel y ejecutar todas las celdas**. No ejecutes únicamente la celda del armado del PowerPoint: las gráficas y el mensaje dependen de las celdas anteriores.
+
+En la salida confirma `📅 Fecha máxima en BANCI: ...` y `Mensaje BANCI: ...`. En los datos actuales el límite es 30 de septiembre de 2026; el gráfico de la diapositiva 10 excluye 479 casos de octubre y 42 de noviembre. Ambos totales deben conservar su valor original. Si la plantilla no sustituye el marcador, el armado se detiene con un error explícito.
 
 ## 🔧 Cómo Funciona
 
@@ -30,14 +39,14 @@ Cuando ejecutas el notebook:
 📅 Fecha máxima en BANCI: 2026-09-30
 ```
 
-Los gráficos de slides 9 y 10 se cortarán automáticamente en esa fecha. Si BANCI reporta hasta septiembre, los datos de octubre y noviembre no aparecerán en los gráficos.
+Los gráficos de slides 9 y 10 se cortarán automáticamente en esa fecha: las filas posteriores se quitan antes del agrupamiento, y no solo del eje.
 
 ### Mensaje Dinámico
 
 El mensaje se genera automáticamente y se ve como:
 
 ```
-No se muestran 1,234 casos de octubre y 5,678 correspondientes a noviembre 
+No se muestran 479 casos de octubre y 42 correspondientes a noviembre
 ya que están por ser verificados con BANCI
 ```
 
@@ -63,8 +72,7 @@ El mensaje se reemplazará automáticamente con el contenido dinámico.
 
 ### Ubicaciones Sugeridas
 
-- **Slide 10 (recomendado)**: Debajo o arriba del gráfico "Sin carpeta de investigación"
-- **Slide 9 (opcional)**: Si también quieres un mensaje para folio válido
+- **Diapositiva 10**: El marcador ya está en la plantilla, junto al gráfico de folio válido.
 
 ## 📈 Ejemplo de Resultados
 
@@ -78,7 +86,7 @@ Gráfico muestra: enero, febrero, marzo, abril, mayo, junio, julio, agosto,
 ```
 Gráfico muestra: enero, febrero, marzo, abril, mayo, junio, julio, agosto, septiembre
 
-Mensaje: "No se muestran 1,234 casos de octubre y 5,678 correspondientes a noviembre 
+Mensaje: "No se muestran 479 casos de octubre y 42 correspondientes a noviembre
          ya que están por ser verificados con BANCI"
 ```
 
@@ -92,7 +100,7 @@ Mensaje: "No se muestran 1,234 casos de octubre y 5,678 correspondientes a novie
 
 **Opción B: Cambiar manualmente el período**
 
-Edita la celda 6 del notebook:
+En la celda nueva de gráficas, cambia el período de las dos `Slice`:
 
 ```python
 # Cambiar de esto:
@@ -127,27 +135,27 @@ Slice("rn-no-ba", "01ene25-max", estatus="des", subfiltro="cfval")
 #### `fecha_max_banci()`
 ```python
 fecha_max_banci()
-# Retorna: pd.Timestamp o None
+# Retorna: pd.Timestamp; lanza ValueError si no hay fechas válidas en BANCI
 # Ejemplo: Timestamp('2026-09-30 00:00:00')
 ```
 
-#### `serie_mensual_hasta_banci(s, fecha_limite=None)`
+#### `serie_mensual_hasta_banci(s, fecha_limite)`
 ```python
 serie_mensual_hasta_banci(
     Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"),
-    fecha_limite=pd.Timestamp('2026-09-30')  # Opcional
+    fecha_limite=pd.Timestamp('2026-09-30')
 )
 # Retorna: DataFrame con columnas ['mes', 'registros']
 ```
 
-#### `generar_mensaje_fechas_no_contempladas(s, fecha_limite=None)`
+#### `generar_mensaje_fechas_no_contempladas(s, fecha_limite)`
 ```python
 generar_mensaje_fechas_no_contempladas(
-    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="sfval"),
-    fecha_limite=None  # Si no se proporciona, usa fecha_max_banci()
+    Slice("rn-no-ba", "01oct24-max", estatus="des", subfiltro="cfval"),
+    fecha_limite=pd.Timestamp('2026-09-30')
 )
 # Retorna: str
-# Ejemplo: "No se muestran 1,234 casos de octubre y 5,678 correspondientes a noviembre ya que están por ser verificados con BANCI"
+# Ejemplo: "No se muestran 479 casos de octubre y 42 correspondientes a noviembre ya que están por ser verificados con BANCI"
 ```
 
 ## ✨ Ventajas de Esta Implementación

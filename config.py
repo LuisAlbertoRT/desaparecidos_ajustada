@@ -358,7 +358,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-05.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-06.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
