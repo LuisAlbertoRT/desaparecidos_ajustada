@@ -1,0 +1,193 @@
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                 🔄 FLUJO DE PROCESAMIENTO - SLIDES 9 Y 10                   ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CELDA 11: Preparación de Variables                                          │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│  ▼ Se cargan los datos:                                                      │
+│    dfs = u.dataframes(PARA_GRAFICAS)                                         │
+│    ├─ reg_rn-si-ba_01oct24-max_des  (desaparecidos con/sin BANCI)           │
+│    ├─ fha_de_hchos_derivada_banci   (fecha de hechos en BANCI)             │
+│    └─ otros slices...                                                        │
+│                                                                              │
+│  ▼ Se generan indicadores:                                                   │
+│    vars_ppt = u.indicadores(CONTEOS, porcentajes=..., extra={...})          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CELDA 15: Cálculo de Fecha Máxima BANCI                                     │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ 📅 fecha_max_banci()                                                 │   │
+│  ├──────────────────────────────────────────────────────────────────────┤   │
+│  │                                                                      │   │
+│  │  1. Busca: "reg_rn-si-ba_01oct24-max_des" en dfs                    │   │
+│  │  2. Extrae: df_banci["fha_de_hchos_derivada_banci"]                 │   │
+│  │  3. Calcula: max(fecha)                                              │   │
+│  │  4. Retorna: pd.Timestamp('2026-09-30')                             │   │
+│  │                                                                      │   │
+│  │  ✅ FECHA_MAX_BANCI = 2026-09-30                                     │   │
+│  │  📊 Imprime: "📅 Fecha máxima en BANCI: 2026-09-30"                 │   │
+│  │                                                                      │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▼
+        ┌───────────────────────────┴───────────────────────────┐
+        ▼                                                         ▼
+┌─────────────────────────────────┐   ┌─────────────────────────────────┐
+│ SLIDE 9: Con Folio Válido       │   │ SLIDE 10: Sin Folio Válido      │
+│ (Carpeta de Investigación OK)   │   │ (Sin Carpeta de Investigación)  │
+├─────────────────────────────────┤   ├─────────────────────────────────┤
+│                                 │   │                                 │
+│ Gráfico: cfval                  │   │ Gráfico: sfval                  │
+│                                 │   │ Mensaje: {{msg_fechas_no_cont}} │
+│                                 │   │                                 │
+│ ┌─────────────────────────────┐ │   │ ┌─────────────────────────────┐ │
+│ │ serie_mensual_hasta_banci() │ │   │ │ serie_mensual_hasta_banci() │ │
+│ ├─────────────────────────────┤ │   │ ├─────────────────────────────┤ │
+│ │                             │ │   │ │                             │ │
+│ │ Input:                      │ │   │ │ Input:                      │ │
+│ │ Slice("rn-no-ba",          │ │   │ │ Slice("rn-no-ba",          │ │
+│ │        "01oct24-max",       │ │   │ │        "01oct24-max",       │ │
+│ │        estatus="des",       │ │   │ │        estatus="des",       │ │
+│ │        subfiltro="cfval")   │ │   │ │        subfiltro="sfval")   │ │
+│ │                             │ │   │ │                             │ │
+│ │ Procesamiento:              │ │   │ │ Procesamiento:              │ │
+│ │ 1. fecha_limite = 2026-09-30│ │   │ │ 1. fecha_limite = 2026-09-30│ │
+│ │ 2. Agrupar por mes          │ │   │ │ 2. Agrupar por mes          │ │
+│ │ 3. Filtrar até 2026-09-30   │ │   │ │ 3. Filtrar até 2026-09-30   │ │
+│ │                             │ │   │ │                             │ │
+│ │ Output: DataFrame            │ │   │ │ Output: DataFrame            │ │
+│ │ ┌───────────────────────┐   │ │   │ │ ┌───────────────────────┐   │ │
+│ │ │ mes    │ registros    │   │ │   │ │ │ mes    │ registros    │   │ │
+│ │ ├───────────────────────┤   │ │   │ │ ├───────────────────────┤   │ │
+│ │ │ 2024-10│   1,234      │   │ │   │ │ │ 2024-10│   5,678      │   │ │
+│ │ │ 2024-11│     987      │   │ │   │ │ │ 2024-11│   4,321      │   │ │
+│ │ │ ...    │    ...       │   │ │   │ │ │ ...    │    ...       │   │ │
+│ │ │ 2026-09│   3,123      │   │ │   │ │ │ 2026-09│   2,456      │   │ │
+│ │ │ 2026-10│    ❌ NO     │   │ │   │ │ │ 2026-10│    ❌ NO     │   │ │
+│ │ │ 2026-11│    ❌ NO     │   │ │   │ │ │ 2026-11│    ❌ NO     │   │ │
+│ │ └───────────────────────┘   │ │   │ │ └───────────────────────┘   │ │
+│ │                             │ │   │ │                             │ │
+│ └─────────────────────────────┘ │   │ └─────────────────────────────┘ │
+│                                 │   │                                 │
+│ ▼ Gráfico generado              │   │ ▼ Gráfico generado              │
+│ [Barra vertical hasta sep 2026] │   │ [Barra vertical hasta sep 2026] │
+│                                 │   │                                 │
+└─────────────────────────────────┘   │ ┌─────────────────────────────┐ │
+                                      │ │ generar_mensaje_...(...)    │ │
+                                      │ ├─────────────────────────────┤ │
+                                      │ │                             │ │
+                                      │ │ Input:                      │ │
+                                      │ │ Slice("rn-no-ba", ...)      │ │
+                                      │ │                             │ │
+                                      │ │ Procesamiento:              │ │
+                                      │ │ 1. Buscar registros después │ │
+                                      │ │    de 2026-09-30            │ │
+                                      │ │ 2. Agrupar por mes          │ │
+                                      │ │ 3. Contar casos por mes     │ │
+                                      │ │ 4. Traducir meses           │ │
+                                      │ │ 5. Formatear mensaje        │ │
+                                      │ │                             │ │
+                                      │ │ Output: str                 │ │
+                                      │ │ "No se muestran 2,456       │ │
+                                      │ │  casos de octubre y         │ │
+                                      │ │  1,234 correspondientes a   │ │
+                                      │ │  noviembre ya que están     │ │
+                                      │ │  por ser verificados con    │ │
+                                      │ │  BANCI"                     │ │
+│                                 │   │                             │ │
+│                                 │   └─────────────────────────────┘ │
+│                                 │                                 │
+└─────────────────────────────────┴─────────────────────────────────┘
+        ▼                                                         ▼
+┌─────────────────────────────┐   ┌─────────────────────────────────┐
+│ vars_ppt agregado:          │   │ vars_ppt agregado:              │
+│ ────────────────────────    │   │ ────────────────────────────    │
+│ "gr_mes_rn-no-ba_..." → PNG │   │ "gr_mes_rn-no-ba_..." → PNG     │
+│                             │   │ "msg_fechas_no_cont" → string   │
+└─────────────────────────────┘   └─────────────────────────────────┘
+        ▼                                                         ▼
+        └───────────────────────────┬───────────────────────────┘
+                                    ▼
+        ┌───────────────────────────────────────────────────────┐
+        │ CELDA 16: Armado de la Presentación PowerPoint        │
+        ├───────────────────────────────────────────────────────┤
+        │                                                       │
+        │ PPTReportBuilder recibe vars_ppt con:                │
+        │  - Gráficos (PNG de slides 9 y 10)                   │
+        │  - Mensaje dinámico (msg_fechas_no_cont)             │
+        │                                                       │
+        │ Reemplaza marcadores en plantilla:                   │
+        │  {{gr_mes_rn-no-ba_..._cfval}} → PNG slide 9         │
+        │  {{gr_mes_rn-no-ba_..._sfval}} → PNG slide 10        │
+        │  {{msg_fechas_no_cont}} → "No se muestran..."        │
+        │                                                       │
+        │ ▼ Genera PPTX final                                  │
+        │                                                       │
+        └───────────────────────────────────────────────────────┘
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │ ✅ Presentación Generada      │
+                    │                               │
+                    │ Slide 9:                      │
+                    │ ┌─────────────────────────┐   │
+                    │ │ Gráfico de folio válido │   │
+                    │ │ (corto: oct24-sep26)    │   │
+                    │ └─────────────────────────┘   │
+                    │                               │
+                    │ Slide 10:                     │
+                    │ ┌─────────────────────────┐   │
+                    │ │ Gráfico sin folio       │   │
+                    │ │ (corto: oct24-sep26)    │   │
+                    │ ├─────────────────────────┤   │
+                    │ │ No se muestran 2,456... │   │
+                    │ │ ...verificados BANCI    │   │
+                    │ └─────────────────────────┘   │
+                    │                               │
+                    └───────────────────────────────┘
+
+
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                          🎯 RESUMEN VISUAL                                  ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  ANTES:  [Gráfico con datos hasta NOV 2026] ❌ Incluye meses sin verificar  ║
+║                                                                              ║
+║  DESPUÉS: [Gráfico con datos hasta SEP 2026] ✅ Solo datos verificados      ║
+║           + "No se muestran X casos de octubre y Y de noviembre..."         ║
+║                                                                              ║
+║  FECHA CRÍTICA: 2026-09-30 (Última reportada por BANCI)                     ║
+║                                                                              ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+
+VARIABLES CLAVE EN LA EJECUCIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ FECHA_MAX_BANCI ──────────┐
+│ Tipo: pd.Timestamp         │
+│ Valor: 2026-09-30          │
+│ Alcance: Global            │
+│ Cálculo: Una sola vez      │
+└────────────────────────────┘
+
+┌─ tabla (Slide 9) ──────────┐
+┌─ tabla (Slide 10) ─────────┐
+│ Tipo: DataFrame            │
+│ Columnas: ['mes', 'reg']   │
+│ Filas: 12 meses (oct24-sep26)
+│ Alcance: Local a gráfico   │
+└────────────────────────────┘
+
+┌─ msg_fechas_no_cont ───────┐
+│ Tipo: str                  │
+│ Valor: "No se muestran..." │
+│ Alcance: Plantilla PPTX    │
+└────────────────────────────┘
+

@@ -358,7 +358,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-10-28.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-05.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -789,14 +789,14 @@ def parquet_rnpdno_mas_reciente(directorio=None) -> Path | None:
 
 # MODO LOCAL: el archivo EXACTO que se lee cuando no se baja nada de Drive. A
 # diferencia del modo "drive", aquí no se busca el más reciente ni se revisa la
-# fecha del corte: se corre el archivo que diga esta línea, y si no existe el
+# fecha del corte: se corre el archivo que diga esta línea, ys si no existe el
 # notebook 1 se detiene.
 # Puede ser el Parquet consolidado (.parquet) o el Excel de tres hojas (.xlsx): el
 # formato se reconoce por la extensión (ver `formato_rnpdno`, abajo).
 # Sobrescribir sin editar este archivo:  PIPELINE_RNPDNO_ARCHIVO=/ruta/al.parquet
 RNPDNO_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_RNPDNO_ARCHIVO",
-    RNPDNO_MANUAL_DIR / "reporte_personas_completo_06102026.parquet",                      # Aquí se cambia el RNPDNO
+    RNPDNO_MANUAL_DIR / "reporte_personas_completo_19102026.parquet",                      # Aquí se cambia el RNPDNO
     #RNPDNO_MANUAL_DIR / "reporte_personas_01072026.xlsx",                                 # Aquí se cambia el RNPDNO
 )
 
