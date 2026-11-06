@@ -1,0 +1,133 @@
+================================================================================
+RESUMEN DE CAMBIOS: FILTRADO BANCI EXTENDIDO A SLIDES 11-13
+================================================================================
+
+ARCHIVO MODIFICADO:
+  📄 notebooks/6_PPT_Reporte_Diario.ipynb (Celda 15)
+
+CAMBIOS REALIZADOS:
+  
+  1. Se amplió la tupla _graficas_banci de 2 a 5 gráficos
+  
+  ANTES (solo 2 gráficos):
+  ───────────────────────
+    ("gr_mes_rn-si-ba_01oct24-max_des", Slice(...), "#af5967ff")           # Slide 9
+    ("gr_mes_rn-no-ba_01oct24-max_des_cfval", Slice(...), "#9b2347ff")     # Slide 10
+
+  DESPUÉS (5 gráficos):
+  ────────────────────
+    ("gr_mes_rn-si-ba_01oct24-max_des", Slice(...), "#af5967ff")           # Slide 9
+    ("gr_mes_rn-no-ba_01oct24-max_des_cfval", Slice(...), "#9b2347ff")     # Slide 10
+    ("gr_mes_rn-no-ba_01oct24-max_des_sfval", Slice(...), "#595959ff")     # Slide 11 ✨ NUEVO
+    ("gr_mes_rn-no-ba_01oct24-max_des_sfval_sfvac", Slice(...), "#757575ff") # Slide 12 ✨ NUEVO
+    ("gr_mes_rn-no-ba_01oct24-max_des_sfval_cfvac", Slice(...), "#888888ff") # Slide 13 ✨ NUEVO
+
+  2. Se actualizó el comentario de la celda:
+  
+  ANTES: "# Regenerar solo las imágenes de las diapositivas 9 y 10; ..."
+  DESPUÉS: "# Regenerar las imágenes de las diapositivas 9-13 con filtrado ..."
+
+================================================================================
+
+GRÁFICOS PROCESADOS CON FILTRADO BANCI:
+
+  ✅ Slide 9  → gr_mes_rn-si-ba_01oct24-max_des
+     └─ Casos CON match en BANCI
+     └─ Color: #af5967ff (rosa)
+     └─ Slices: rn-si-ba, 01oct24-max, estatus=des
+
+  ✅ Slide 10 → gr_mes_rn-no-ba_01oct24-max_des_cfval  
+     └─ Desaparecidos SIN match, con folio válido
+     └─ Color: #9b2347ff (rojo oscuro)
+     └─ Slices: rn-no-ba, 01oct24-max, estatus=des, subfiltro=cfval
+     └─ NOTA: Incluye mensaje en pie de página
+
+  ✅ Slide 11 → gr_mes_rn-no-ba_01oct24-max_des_sfval
+     └─ Desaparecidos SIN match, SIN folio válido (completo)
+     └─ Color: #595959ff (gris oscuro)
+     └─ Slices: rn-no-ba, 01oct24-max, estatus=des, subfiltro=sfval
+
+  ✅ Slide 12 → gr_mes_rn-no-ba_01oct24-max_des_sfval_sfvac
+     └─ Desaparecidos SIN match, folio inválido
+     └─ Color: #757575ff (gris medio)
+     └─ Slices: rn-no-ba, 01oct24-max, estatus=des, subfiltro=sfval_sfvac
+
+  ✅ Slide 13 → gr_mes_rn-no-ba_01oct24-max_des_sfval_cfvac
+     └─ Desaparecidos SIN match, campo de folio vacío
+     └─ Color: #888888ff (gris claro)
+     └─ Slices: rn-no-ba, 01oct24-max, estatus=des, subfiltro=sfval_cfvac
+
+================================================================================
+
+LÓGICA DE EJECUCIÓN:
+
+  1. FECHA_MAX_BANCI se calcula una sola vez (p. ej: 2026-09-30)
+  
+  2. Para cada gráfico en _graficas_banci:
+     ├─ Se llama a serie_mensual_hasta_banci(_slice_banci, FECHA_MAX_BANCI)
+     ├─ Filtra todas las filas con fechas > FECHA_MAX_BANCI ANTES de agrupar
+     ├─ Se regenera la imagen PNG del gráfico
+     ├─ Se verifica si tiene datos
+     └─ Se imprime el resumen (nombre, cantidad, mes máximo)
+  
+  3. Se genera el mensaje informativo (solo usado en slide 10):
+     └─ "No se muestran X casos de mes1 y Y casos de mes2 ya que..."
+
+================================================================================
+
+IMPACTO:
+
+  ✅ LOS TOTALES NO CAMBIAN
+     └─ {{reg_rn-si-ba_01oct24-max_des}}
+     └─ {{reg_rn-no-ba_01oct24-max_des_cfval}}
+     └─ {{reg_rn-no-ba_01oct24-max_des_sfval}}
+     └─ {{reg_rn-no-ba_01oct24-max_des_sfval_sfvac}}
+     └─ {{reg_rn-no-ba_01oct24-max_des_sfval_cfvac}}
+
+  ✅ SOLO LOS GRÁFICOS se recortan al mes de BANCI
+  
+  ✅ El mensaje informativo solo se agrega a slide 10
+  
+  ✅ Slides 11-13 no tienen pie de página adicional
+
+================================================================================
+
+VERIFICACIÓN DESPUÉS DE CAMBIOS:
+
+  Al ejecutar el notebook, deberías ver en la salida:
+
+    📅 Fecha máxima en BANCI: 2026-09-30
+    📊 gr_mes_rn-si-ba_01oct24-max_des: 7,034 casos; corte September 2026
+    📊 gr_mes_rn-no-ba_01oct24-max_des_cfval: 7,887 casos; corte September 2026
+    📊 gr_mes_rn-no-ba_01oct24-max_des_sfval: 5,392 casos; corte September 2026
+    📊 gr_mes_rn-no-ba_01oct24-max_des_sfval_sfvac: 3,163 casos; corte September 2026
+    📊 gr_mes_rn-no-ba_01oct24-max_des_sfval_cfvac: 2,229 casos; corte September 2026
+    Mensaje BANCI: No se muestran 475 casos de octubre y 56 correspondientes...
+
+================================================================================
+
+FUNCIONES UTILIZADAS (existentes):
+
+  • fecha_max_banci()
+    └─ Extrae la fecha máxima de BANCI
+
+  • serie_mensual_hasta_banci(s, fecha_limite)
+    └─ Filtra el slice hasta fecha_limite y agrupa por mes
+
+  • generar_mensaje_fechas_no_contempladas(s, fecha_limite)
+    └─ Genera texto con meses y casos posteriores a fecha_limite
+
+  • barras_verticales(...)
+    └─ Dibuja el gráfico de barras
+
+  • dimensiones_placeholder(PLANTILLA, nombre)
+    └─ Obtiene tamaño del placeholder de la plantilla
+
+================================================================================
+
+COMMITS RELACIONADOS:
+
+  1a02d01 - feat: extender filtrado BANCI a slides 11-13
+  3735f14 - docs: actualizar instrucciones para slides 9-13 con filtrado BANCI
+
+================================================================================
