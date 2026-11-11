@@ -83,7 +83,13 @@ uno que no lo cumpla:
 |---|---|
 | `idestado_derivada_rnpdno` | clave INEGI de entidad. **Dimensión de rebanada**, no filtro previo |
 | `nombre_entidad_derivada_rnpdno` | nombre de la entidad, derivado de la clave |
+| `estado_final_nuevo`, `idestado_final_nuevo` | nombre y clave de la entidad mencionada de manera inequívoca en `dependencia_origen_rnpdno`, incluso si BANCI modifica la dependencia derivada. Se reconocen nombres y alias completos en cualquier posición; si no hay una entidad reconocible o hay varias distintas, se usa `idestado_derivada_rnpdno` como respaldo. Si tampoco es válido, quedan nulos |
 | `idmunicipio_derivada_rnpdno` | clave municipal numérica. El texto original (`"75.0"`) queda en `idmunicipio_rnpdno` del Parquet del ETL |
+
+Cuando `USAR_ESTADO_EXTRAIDO_EN_PRESENTACIONES` está activado, las rebanadas por
+entidad utilizan `idestado_final_nuevo`. Los municipios y CVEGEO del notebook 4
+siguen correspondiendo a `idestado_derivada_rnpdno`, no a la entidad de la
+dependencia.
 
 ### Resultado del matching
 

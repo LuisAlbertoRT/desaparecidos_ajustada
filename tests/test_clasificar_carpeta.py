@@ -15,6 +15,33 @@ class ClasificarCarpetaTests(unittest.TestCase):
         )
         self.assertTrue(resultado.iloc[0])
 
+    def test_modalidad_5_acepta_coincidencia_con_entidad_rnpdno(self):
+        resultado = clasificar_carpeta(
+            pd.Series(["CI-ABC-12345-08-26"]),
+            pd.Series([1]),
+            modalidad=5,
+            cve_entidad_alternativa=pd.Series([9]),
+        )
+        self.assertTrue(resultado.iloc[0])
+
+    def test_modalidad_5_acepta_coincidencia_con_estado_extraido(self):
+        resultado = clasificar_carpeta(
+            pd.Series(["CI-ABC-12345-08-26"]),
+            pd.Series([9]),
+            modalidad=5,
+            cve_entidad_alternativa=pd.Series([1]),
+        )
+        self.assertTrue(resultado.iloc[0])
+
+    def test_modalidad_5_rechaza_si_no_coincide_con_ninguna_entidad(self):
+        resultado = clasificar_carpeta(
+            pd.Series(["CI-ABC-12345-08-26"]),
+            pd.Series([9]),
+            modalidad=5,
+            cve_entidad_alternativa=pd.Series([32]),
+        )
+        self.assertFalse(resultado.iloc[0])
+
 
 if __name__ == "__main__":
     unittest.main()

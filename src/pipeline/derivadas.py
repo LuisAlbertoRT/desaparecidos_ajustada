@@ -29,7 +29,7 @@ from src.settings import Settings
 # columnas conservadas o la lógica de derivación: entra en `clave_universo`. El
 # caché no depende de que se suba: su llave ya incluye el código de la capa
 # (`huella.huella_codigo`).
-VERSION_DERIVADAS = 27
+VERSION_DERIVADAS = 28
 
 # ── Columnas conservadas en el universo ──────────────────────────────────────
 # Todo lo que no esté aquí (ni sea una bandera is_*) se descarta: las columnas
@@ -158,23 +158,30 @@ _ALIAS_ESTADO_ID.update({
     "MICHOACAN DE OCAMPO": 16,
     "VERACRUZ DE IGNACIO DE LA LLAVE": 30,
 })
-_ESTADO_FINAL_RE = re.compile(
-    r"(?:^| )(" + "|".join(
+_ESTADO_RE = re.compile(
+    r"(?<![A-Z0-9])(" + "|".join(
         re.escape(alias)
         for alias in sorted(_ALIAS_ESTADO_ID, key=len, reverse=True)
-    ) + r")$"
+    ) + r")(?![A-Z0-9])"
 )
+
+
+def _estado_en_dependencia(dependencia: str) -> int | None:
+    ids = {_ALIAS_ESTADO_ID[m.group(1)] for m in _ESTADO_RE.finditer(dependencia)}
+    return next(iter(ids)) if len(ids) == 1 else None
 
 
 def _resolver_estado_extraido(
     dependencia: pd.Series, idestado: pd.Series
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """Devuelve estado final, coincidencia textual y respaldo por ID."""
+    """Prioriza una entidad inequívoca en el texto y respalda con el ID."""
     dependencia_norm = dependencia.astype("string").fillna("").map(
         _normalizar_nombre_estado
     )
-    alias_final = dependencia_norm.str.extract(_ESTADO_FINAL_RE, expand=False)
-    id_texto = alias_final.map(_ALIAS_ESTADO_ID)
+    entidades_por_texto = {
+        texto: _estado_en_dependencia(texto) for texto in dependencia_norm.unique()
+    }
+    id_texto = dependencia_norm.map(entidades_por_texto)
     estado_texto = id_texto.map(config.ENTIDADES).astype("object")
 
     ids = pd.to_numeric(idestado, errors="coerce")
@@ -279,7 +286,7 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
 
     col_dependencia_estado = _primera(
         rn,
-        ["dependencia_origen_derivada_rnpdno_banci", "dependencia_origen_rnpdno"],
+        ["dependencia_origen_rnpdno", "dependencia_origen_derivada_rnpdno_banci"],
     )
     dependencia_estado = (
         rn[col_dependencia_estado]
@@ -287,16 +294,16 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
         else pd.Series(pd.NA, index=rn.index, dtype="object")
     )
     if (
-        col_dependencia_estado == "dependencia_origen_derivada_rnpdno_banci"
-        and "dependencia_origen_rnpdno" in rn.columns
+        col_dependencia_estado == "dependencia_origen_rnpdno"
+        and "dependencia_origen_derivada_rnpdno_banci" in rn.columns
     ):
         dependencia_estado = dependencia_estado.astype("string")
-        dependencia_original = rn["dependencia_origen_rnpdno"].astype("string")
+        dependencia_derivada = rn["dependencia_origen_derivada_rnpdno_banci"].astype("string")
         dependencia_no_vacia = (
             dependencia_estado.str.strip().ne("").fillna(False)
         )
         dependencia_estado = dependencia_estado.where(
-            dependencia_no_vacia, dependencia_original
+            dependencia_no_vacia, dependencia_derivada
         )
 
     col_idestado = _primera(rn, ["idestado_derivada_rnpdno", "idestado"])
@@ -421,19 +428,26 @@ def derivar_rnpdno(rn: pd.DataFrame, fubs: set[str], mapa_tipo_match: dict,
     # persona le faltan campos de identificación).
     from src.cleaning import clasificar_carpeta, carpeta_validada_manual
     col_ent_rn = _primera(rn, ["idestado_derivada_rnpdno", "idestado"])
-    entidad_carpeta = (
-        id_estado_final
-        if cfg.usar_estado_extraido_para_clasificar_carpeta
-        else rn[col_ent_rn] if col_ent_rn else None
-    )
+    entidad_carpeta_alternativa = None
+    if cfg.modalidad_clasificacion_carpeta == 5:
+        entidad_carpeta = rn[col_ent_rn] if col_ent_rn else None
+        entidad_carpeta_alternativa = id_estado_final
+    else:
+        entidad_carpeta = (
+            id_estado_final
+            if cfg.usar_estado_extraido_para_clasificar_carpeta
+            else rn[col_ent_rn] if col_ent_rn else None
+        )
     if "expedientes_rnpdno" in rn.columns:
         vacio = rn["expedientes_rnpdno"].astype("object").fillna("").astype(str).str.strip().eq("").to_numpy()
-        # La modalidad 1 no necesita la entidad; la 2, la 3 y la 4 sí, y sin ella no pueden
-        # evaluar nada, así que se conserva el respaldo en ceros.
+        # La modalidad 1 no necesita entidad; las modalidades por entidad necesitan al
+        # menos una clave, así que se conserva el respaldo en ceros si no hay ninguna.
         usa_entidad = cfg.modalidad_clasificacion_carpeta != 1
         valido = (clasificar_carpeta(rn["expedientes_rnpdno"], entidad_carpeta,
-                                     modalidad=cfg.modalidad_clasificacion_carpeta).to_numpy()
-                  if entidad_carpeta is not None or not usa_entidad else np.zeros(len(rn), dtype=bool))
+                                     modalidad=cfg.modalidad_clasificacion_carpeta,
+                                     cve_entidad_alternativa=entidad_carpeta_alternativa).to_numpy()
+                  if (entidad_carpeta is not None or entidad_carpeta_alternativa is not None
+                      or not usa_entidad) else np.zeros(len(rn), dtype=bool))
     else:
         vacio = np.ones(len(rn), dtype=bool)
         valido = np.zeros(len(rn), dtype=bool)

@@ -358,7 +358,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-06.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-11.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -1057,11 +1057,12 @@ ENTIDADES = {
 # 3: Como la 2, pero con CATALOGO_REGEX_CI_POR_ENTIDAD_2 y, en Oaxaca, una segunda capa:
 #    las siglas del folio deben estar en NOMENCLATURAS_OAXACA
 # 4: Unión de la 2 y la 3 con CATALOGO_REGEX_CI_POR_ENTIDAD_3, sin la capa de siglas de Oaxaca
-MODALIDAD_CLASIFICACION_CARPETA = 4
+# 5: Como la 4, valida contra la entidad del RNPDNO O estado_final_nuevo; basta que uno coincida
+MODALIDAD_CLASIFICACION_CARPETA = 5
 
 # False: clasifica con `idestado_derivada_rnpdno` (estado del RNPDNO).
 # True: usa `idestado_final_nuevo`, la clave numérica del estado extraído que se
-# presenta como `estado_final_nuevo`.
+# presenta como `estado_final_nuevo`. La modalidad 5 siempre evalúa ambos estados.
 USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA = True
 
 # Validación manual de carpeta, encima de MODALIDAD_CLASIFICACION_CARPETA:

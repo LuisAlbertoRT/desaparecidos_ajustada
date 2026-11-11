@@ -7,6 +7,7 @@ from src.pipeline.derivadas import (
     _id_estado_extraido,
     _resolver_estado_extraido,
     columna_dimension,
+    derivar_rnpdno,
 )
 from src.settings import Settings
 
@@ -77,12 +78,35 @@ class ResolverEstadoExtraidoTests(unittest.TestCase):
             ],
         )
 
-    def test_solo_extrae_estado_al_final_y_no_subcadenas(self):
-        final, _, _ = self.resolver(
-            ["Oficina de Jalisco, sede central", "Fiscalía de Chihuahua"],
-            [17, 8],
+    def test_todas_las_entidades_del_catalogo_son_reconocidas(self):
+        entidades = [config.ENTIDADES[clave] for clave in range(1, 33)]
+        final, texto, _ = self.resolver(
+            [f"Dependencia de {entidad}, sede central" for entidad in entidades],
+            [None] * len(entidades),
         )
-        self.assertEqual(final.tolist(), [config.ENTIDADES[17], config.ENTIDADES[8]])
+        self.assertEqual(final.tolist(), entidades)
+        self.assertEqual(texto.tolist(), entidades)
+
+    def test_extrae_estado_en_cualquier_posicion_sin_subcadenas(self):
+        final, texto, _ = self.resolver(
+            ["Oficina de Jalisco, sede central", "Fiscalía de Chihuahua",
+             "Oficina de Jaliscoense"],
+            [17, 8, 17],
+        )
+        self.assertEqual(
+            final.tolist(), [config.ENTIDADES[14], config.ENTIDADES[8], config.ENTIDADES[17]]
+        )
+        self.assertTrue(pd.isna(texto.iloc[2]))
+
+    def test_varios_estados_son_ambiguos_y_se_usa_respaldo(self):
+        final, texto, _ = self.resolver(
+            ["Oficina de Jalisco y Colima", "Estado de México y CDMX",
+             "Coahuila de Zaragoza, Coahuila"],
+            [17, 15, 8],
+        )
+        self.assertEqual(final.tolist(), [config.ENTIDADES[17], config.ENTIDADES[15], config.ENTIDADES[5]])
+        self.assertTrue(texto.iloc[:2].isna().all())
+        self.assertEqual(texto.iloc[2], config.ENTIDADES[5])
 
     def test_fallback_valido_y_valores_no_resueltos(self):
         final, texto, respaldo = self.resolver(
@@ -111,6 +135,59 @@ class ResolverEstadoExtraidoTests(unittest.TestCase):
         self.assertEqual(texto.iloc[0], config.ENTIDADES[15])
         self.assertEqual(respaldo.iloc[0], config.ENTIDADES[9])
         self.assertNotEqual(texto.iloc[0], respaldo.iloc[0])
+
+    def test_derivacion_usa_dependencia_original_con_match_banci(self):
+        fub = "109F64579-C6D1-41AE-B122-E78B57924791"
+        rn = pd.DataFrame({
+            "fub_rnpdno": [fub, "sin-match", "sin-estado"],
+            "dependencia_origen_rnpdno": [
+                "FISCALIA GENERAL DE TABASCO", "OFICINA DE JALISCO", "PORTAL",
+            ],
+            "idestado_derivada_rnpdno": [26, 17, 1],
+            "fecha_hechos_modificada_derivada_rnpdno": pd.to_datetime(
+                ["2024-10-01"] * 3
+            ),
+            "clasificacion_des_derivada_rnpdno": ["Desaparecidos"] * 3,
+            "curp_vic_valida_derivada_rnpdno": [False] * 3,
+        })
+        cfg = Settings.desde_dict({
+            "reglas_post": ["actualizar_rn_con_banci"],
+            "modalidad_manual_clasificacion_carpeta": False,
+            "propagar_delito_banci": False,
+        })
+        resultado = derivar_rnpdno(rn, {fub}, {fub: "manual"}, cfg, verbose=False)
+        self.assertEqual(
+            resultado["estado_final_nuevo"].tolist(),
+            [config.ENTIDADES[27], config.ENTIDADES[14], config.ENTIDADES[1]],
+        )
+        self.assertEqual(resultado["idestado_final_nuevo"].tolist(), [27, 14, 1])
+        self.assertEqual(
+            resultado.loc[0, "dependencia_origen_derivada_rnpdno_banci"],
+            "FISCALIA GENERAL (BANCI MATCH)",
+        )
+        self.assertTrue(resultado.loc[0, "is_fis_derivada_rnpdno_banci"])
+
+    def test_derivacion_usa_dependencia_derivada_si_original_esta_vacia(self):
+        rn = pd.DataFrame({
+            "fub_rnpdno": ["vacio", "no-vacio"],
+            "dependencia_origen_rnpdno": [None, "PORTAL"],
+            "dependencia_origen_derivada_rnpdno_banci": [
+                "FISCALIA EN TABASCO", "FISCALIA EN TABASCO",
+            ],
+            "idestado_derivada_rnpdno": [26, 26],
+            "fecha_hechos_modificada_derivada_rnpdno": pd.to_datetime(
+                ["2024-10-01"] * 2
+            ),
+            "clasificacion_des_derivada_rnpdno": ["Desaparecidos"] * 2,
+            "curp_vic_valida_derivada_rnpdno": [False] * 2,
+        })
+        cfg = Settings.desde_dict({
+            "reglas_post": [],
+            "modalidad_manual_clasificacion_carpeta": False,
+            "propagar_delito_banci": False,
+        })
+        resultado = derivar_rnpdno(rn, set(), {}, cfg, verbose=False)
+        self.assertEqual(resultado["estado_final_nuevo"].tolist(), ["Tabasco", "Sonora"])
 
     def test_estado_extraido_para_clasificar_carpeta_es_configurable(self):
         anterior = config.USAR_ESTADO_EXTRAIDO_PARA_CLASIFICAR_CARPETA

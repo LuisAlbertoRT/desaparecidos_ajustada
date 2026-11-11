@@ -91,6 +91,7 @@ refinado_skiprows_revision = 0
 #   2 = catálogo de regex por entidad (CATALOGO_REGEX_CI_POR_ENTIDAD)
 #   3 = catálogo CATALOGO_REGEX_CI_POR_ENTIDAD_2 + siglas de Oaxaca (NOMENCLATURAS_OAXACA)
 #   4 = unión de la 2 y la 3 (CATALOGO_REGEX_CI_POR_ENTIDAD_3)
+#   5 = como la 4, acepta el folio si coincide con la entidad RNPDNO o estado_final_nuevo
 # modalidad_clasificacion_carpeta = 2
 # Por defecto se usa `idestado_derivada_rnpdno` para elegir el regex por entidad.
 # Descomenta para usar la clave INEGI derivada de `estado_final_nuevo`.

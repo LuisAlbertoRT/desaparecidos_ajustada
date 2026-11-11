@@ -342,7 +342,8 @@ def _siglas_validas_oaxaca() -> set:
 
 def clasificar_carpeta(expediente: pd.Series,
                        cve_entidad: pd.Series = None,
-                       modalidad: int = None) -> pd.Series:
+                       modalidad: int = None,
+                       cve_entidad_alternativa: pd.Series = None) -> pd.Series:
     """Marca qué expedientes corresponden a una Carpeta de Investigación.
 
     modalidad 1 → `config.RNPDNO_REGEX_CARPETA`, un solo regex para todo el país.
@@ -354,6 +355,8 @@ def clasificar_carpeta(expediente: pd.Series,
     modalidad 4 → `config.CATALOGO_REGEX_CI_POR_ENTIDAD_3`, la unión de los catálogos
                   de la 2 y la 3: pasa todo lo que pasa en cualquiera de ellas. No
                   aplica la capa de siglas de Oaxaca, que quitaría folios de la 2.
+    modalidad 5 → usa el catálogo de la modalidad 4 con ambas claves de entidad;
+                  basta con que el folio pase para cualquiera de ellas.
 
     Si `modalidad` es None se toma de `config.MODALIDAD_CLASIFICACION_CARPETA`.
 
@@ -361,6 +364,18 @@ def clasificar_carpeta(expediente: pd.Series,
     """
     if modalidad is None:
         modalidad = getattr(config, "MODALIDAD_CLASIFICACION_CARPETA", 1)
+
+    if modalidad == 5:
+        claves = [clave for clave in (cve_entidad, cve_entidad_alternativa)
+                  if clave is not None]
+        if not claves:
+            raise ValueError(
+                "La modalidad 5 necesita al menos una clave de entidad INEGI."
+            )
+        valido = pd.Series(False, index=expediente.index)
+        for clave in claves:
+            valido |= clasificar_carpeta(expediente, clave, modalidad=4)
+        return valido
 
     # Los patrones están anclados con ^...$; quita espacios de borde y reduce los
     # espacios internos repetidos, que aparecen en folios válidos capturados.
@@ -373,7 +388,7 @@ def clasificar_carpeta(expediente: pd.Series,
 
     if modalidad not in (2, 3, 4):
         raise ValueError(
-            f"MODALIDAD_CLASIFICACION_CARPETA = {modalidad!r} no es válida. Use 1, 2, 3 o 4."
+            f"MODALIDAD_CLASIFICACION_CARPETA = {modalidad!r} no es válida. Use 1, 2, 3, 4 o 5."
         )
 
     if cve_entidad is None:
