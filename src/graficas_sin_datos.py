@@ -55,6 +55,7 @@ def aviso_sin_datos(nombre: str, ancho: float, alto: float, ruta: Path,
     ruta.mkdir(parents=True, exist_ok=True)
     # Sin bbox_inches="tight": recortaría la figura al texto y perdería la proporción.
     fig.savefig(ruta / f"{nombre}.png", transparent=True, dpi=300)
+    fig.savefig(ruta / f"{nombre}_scour.svg", format="svg", transparent=True)
     plt.close(fig)
 
 

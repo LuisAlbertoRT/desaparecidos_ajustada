@@ -26,6 +26,7 @@ graph LR
     PNG --> PPT
     NB --> PPT["src.ppt_engine.PPTReportBuilder"]:::nb
     PPT --> OUT[("output/ppt_reporte_*/")]:::sal
+    PPT --> SVG[/"notebooks/output/svg_presentacion_final/*.svg"/]:::art
 ```
 
 ## Nombre de los archivos
@@ -115,6 +116,13 @@ a tocar todas para mover una. Lo único compartido es la preparación de los dat
 Para agregar una gráfica se copia el bloque más parecido, se le cambia la rebanada y el
 nombre, y se ajustan sus parámetros. `registrar` apunta el nombre en `GRAFICAS_GENERADAS`,
 que es la lista que el armado de la presentación inserta en la plantilla.
+
+Al terminar el armado, el notebook copia a `notebooks/output/svg_presentacion_final/`
+únicamente los SVG de gráficas cuyos marcadores de imagen sí se sustituyeron en la
+presentación, con nombres `Diap_XX_fecha.svg` (por ejemplo, `Diap_09_11.11.2026.svg`).
+El número corresponde a la posición real de la diapositiva y la fecha es la de emisión
+del archivo PPTX. Esta salida queda separada de los archivos intermedios que guardan las
+funciones de gráficas; el PowerPoint sigue insertando los PNG.
 
 Cada gráfica sustituye al **cuadro de texto** que lleva su marcador, heredando su posición
 y sus medidas (`dimensiones_placeholder`). Así la plantilla manda sobre la maquetación y el
