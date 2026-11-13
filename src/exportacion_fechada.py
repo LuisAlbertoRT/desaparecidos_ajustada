@@ -36,6 +36,14 @@ def exportar_con_fecha(universo, s: Slice, fecha: date | None = None) -> pd.Data
     destino.mkdir(parents=True, exist_ok=True)
     nombre = f"{s.nombre}_{(fecha or date.today()).strftime(FECHA_FORMATO)}"
     df.to_parquet(destino / f"{nombre}.parquet", index=False, engine="pyarrow")
-    df.to_excel(destino / f"{nombre}.xlsx", index=False)
+    
+    # Remove timezone from datetime columns for Excel compatibility
+    df_excel = df.copy()
+    for col in df_excel.columns:
+        if hasattr(df_excel[col], 'dt') and hasattr(df_excel[col].dt, 'tz'):
+            if df_excel[col].dt.tz is not None:
+                df_excel[col] = df_excel[col].dt.tz_localize(None)
+    
+    df_excel.to_excel(destino / f"{nombre}.xlsx", index=False)
     print(f"  💾 {s.nombre}: {len(df):,} registros → {nombre}.parquet / .xlsx")
     return df
