@@ -220,7 +220,7 @@ def preparar_banci_r(
     # Convertir fechas
     for col in [col_b_fecha_hechos, "fha_de_ini", "fecha_inicio", col_b_fha_nac]:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+            df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
 
     # ---------- Filtro de estatus: solo No Localizados ----------
     # Lo gobierna `filtrar_banci_no_localizados` del perfil. En false el motor ve
@@ -716,7 +716,7 @@ def _match_nombre_r(
         # Asegurar tipos de fecha en el merged
         for col in [col_b_fecha_hechos, "fecha_hechos_rnpdno", col_b_fha_nac, "fecha_nacimiento_rnpdno"]:
             if col in merged.columns:
-                merged[col] = pd.to_datetime(merged[col], errors="coerce")
+                merged[col] = pd.to_datetime(merged[col], errors="coerce", utc=True)
         return merged
 
     # ---- Paso 4.3.2: match vs No Localizados ----

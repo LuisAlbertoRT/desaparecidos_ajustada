@@ -202,7 +202,7 @@ def validar(df: pd.DataFrame, archivo, referencia: Optional[dict] = None,
             elif n_nue / n_ant - 1 > UMBRAL_CRECIMIENTO:
                 avisos.append(f"Creció {n_nue / n_ant - 1:.0%} ({n_ant:,} → {n_nue:,}); "
                               "revisa que sea la misma base y no otra más amplia.")
-            meses = (pd.Timestamp(nue).to_period("M") - pd.Timestamp(ant).to_period("M")).n
+            meses = (pd.Timestamp(nue, tz="UTC").to_period("M") - pd.Timestamp(ant, tz="UTC").to_period("M")).n
             if meses > 1:
                 avisos.append(f"Entre {ant} y {nue} hay {meses} meses: ¿falta una entrega?")
             if res["fecha_inicio_min"] != referencia.get("fecha_inicio_min"):

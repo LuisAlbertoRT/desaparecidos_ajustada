@@ -286,7 +286,7 @@ def fecha_consulta(ruta: Path) -> date:
             "forma de saber de qué corte es. El proceso se detiene."
         ) from e
 
-    marca = pd.to_datetime(columna.dropna(), errors="coerce").max()
+    marca = pd.to_datetime(columna.dropna(), errors="coerce", utc=True).max()
     if pd.isna(marca):
         raise RuntimeError(
             f"La columna 'fecha_consulta' de {ruta.name} está vacía o no es una fecha. "

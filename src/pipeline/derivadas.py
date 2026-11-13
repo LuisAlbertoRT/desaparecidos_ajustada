@@ -253,9 +253,9 @@ def columna_fecha_periodo(rn: pd.DataFrame, verbose: bool = True) -> str:
         )
     elegida = presentes[0]
     if verbose and len(presentes) > 1:
-        base = pd.to_datetime(rn[elegida], errors="coerce")
+        base = pd.to_datetime(rn[elegida], errors="coerce", utc=True)
         for otra in presentes[1:]:
-            n = int((pd.to_datetime(rn[otra], errors="coerce") != base).sum())
+            n = int((pd.to_datetime(rn[otra], errors="coerce", utc=True) != base).sum())
             if n:
                 print(f"  ⚠️ '{otra}' difiere de '{elegida}' en {n:,} filas. Se usa "
                       f"'{elegida}' para acotar el período; revisa cuál es la buena.")
