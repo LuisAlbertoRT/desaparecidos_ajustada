@@ -540,3 +540,23 @@ def cruzar_mj_rips(rn, verbose: bool = True):
                   f"cuentan como todavía desaparecidos.")
 
     return subconjuntos, conteos
+
+
+def remove_timezone_for_excel(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove timezone from datetime columns for Excel compatibility.
+    
+    Excel does not support datetimes with timezones. This function converts
+    all tz-aware datetime columns to tz-naive in a copy of the dataframe.
+    
+    Args:
+        df: DataFrame that may contain tz-aware datetime columns
+        
+    Returns:
+        DataFrame with all timezone information removed from datetime columns
+    """
+    df_out = df.copy()
+    for col in df_out.columns:
+        if hasattr(df_out[col], 'dt') and hasattr(df_out[col].dt, 'tz'):
+            if df_out[col].dt.tz is not None:
+                df_out[col] = df_out[col].dt.tz_localize(None)
+    return df_out

@@ -19,6 +19,7 @@ from datetime import date
 import pandas as pd
 
 from src.slices import Slice
+from src.utils import remove_timezone_for_excel
 
 FECHA_FORMATO = "%d%m%Y"      # 08102026
 
@@ -38,12 +39,7 @@ def exportar_con_fecha(universo, s: Slice, fecha: date | None = None) -> pd.Data
     df.to_parquet(destino / f"{nombre}.parquet", index=False, engine="pyarrow")
     
     # Remove timezone from datetime columns for Excel compatibility
-    df_excel = df.copy()
-    for col in df_excel.columns:
-        if hasattr(df_excel[col], 'dt') and hasattr(df_excel[col].dt, 'tz'):
-            if df_excel[col].dt.tz is not None:
-                df_excel[col] = df_excel[col].dt.tz_localize(None)
-    
+    df_excel = remove_timezone_for_excel(df)
     df_excel.to_excel(destino / f"{nombre}.xlsx", index=False)
     print(f"  💾 {s.nombre}: {len(df):,} registros → {nombre}.parquet / .xlsx")
     return df

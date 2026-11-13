@@ -67,6 +67,7 @@ from src.pipeline.carga import cargar_fuentes
 from src.pipeline.exportacion_llaves import _corte, id_registro_banci
 from src.pipeline.motores import _NOMBRES_MOTORES_BA
 from src.pipeline.universo import Universo
+from src.utils import remove_timezone_for_excel
 
 # Columna del archivo ← columna del ETL. El lado BANCI usa las mismas columnas con que
 # el motor manual liga una revisión con su registro (`resolver_revisiones_a_banci`):
@@ -204,8 +205,8 @@ def _exportar(u: Universo, cola: pd.DataFrame, respuesta: str, prefijo: str,
     destino.mkdir(parents=True, exist_ok=True)
     archivo = destino / f"{prefijo}_{corte}.xlsx"
     with pd.ExcelWriter(archivo, engine="openpyxl") as w:
-        out.to_excel(w, sheet_name="revision", index=False)
-        resumen.to_excel(w, sheet_name="resumen", index=False)
+        remove_timezone_for_excel(out).to_excel(w, sheet_name="revision", index=False)
+        remove_timezone_for_excel(resumen).to_excel(w, sheet_name="resumen", index=False)
 
     if verbose:
         print(f"📝 Base de {titulo} → {archivo}")
