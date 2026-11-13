@@ -358,7 +358,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-12.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-13.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -1101,7 +1101,10 @@ def archivos_carpetas_manuales(directorio=None) -> list[Path]:
 RNPDNO_REGEX_CARPETA = r'\bAP\b|\b(CI|CDI)\b'
 
 # Catálogo de Regex para identificar Carpetas de Investigación por entidad federativa - Modalidad 2
+# Nota: Se incluyen entidades federales (FED/Fiscalía General) con sus propios patrones
 CATALOGO_REGEX_CI_POR_ENTIDAD = {
+    "Fiscalía General de la República": r"^(?i)FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z]+)*(?:[-/])\d{7}(?:[-/])\d{4}$",
+    "Fiscalía General (BANCI MATCH)": r"^(?i)FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z]+)*(?:[-/])\d{7}(?:[-/])\d{4}$",
     "Aguascalientes": r"^CI(?:[-/])[A-Za-z]{3}(?:[-/])\d{5}(?:[-/])(0[1-9]|1[0-2])(?:[-/])\d{2}$",
     "Baja California": r"^(?i)\d(?:[-/]?\d{2})(?:[-/]?\d{3})(?:[-/]?\d{4})(?:[-/]?\d{5})$",
     "Baja California Sur": r"^(?i)[a-z]{3}(?:[-/]?[1-9]\d*)(?:[-/]?\d{4})(?:[-/]?nuc)$",
@@ -1145,6 +1148,8 @@ PREFIJO_COAH = r"(?:c\.?i\.?|a\.?p\.?p\.?)"
 
 
 CATALOGO_REGEX_CI_POR_ENTIDAD_2 = {
+    "Fiscalía General de la República": r"^(?i)FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z]+)*(?:[-/])\d{7}(?:[-/])\d{4}$",
+    "Fiscalía General (BANCI MATCH)": r"^(?i)FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z]+)*(?:[-/])\d{7}(?:[-/])\d{4}$",
     "Aguascalientes": r"^(?:CI|CH|ACTC)[-/][A-Za-z]{3}[-/]\d{5}[-/](0[1-9]|1[0-2])[-/]\d{2}$",
     "Baja California": r"^(?i)\d{4}[-/]\d{4}[-/]\d{5}(?:[-/](?:AP|AC|NAC|NUC))?$",
     "Baja California Sur": rf"^(?i)(?:{'|'.join(NOMENCLATURAS_BCS)})(?:[-/]?[1-9]\d*)(?:[-/]?[a-z0-9]+)(?:[-/]?(?:nuc|\d{{4}}))$",
