@@ -126,8 +126,8 @@ def categorizar_tolerancia_fecha(
     Para tipo_match='localizados':
         Exacta | 1-5 días | 6-15 días | 16-30 días | Más de 30 días
     """
-    diff_dias = (pd.to_datetime(fecha1, errors="coerce") -
-                 pd.to_datetime(fecha2, errors="coerce")).abs().dt.days
+    diff_dias = (pd.to_datetime(fecha1, errors="coerce", utc=True) -
+                 pd.to_datetime(fecha2, errors="coerce", utc=True)).abs().dt.days
     nan_mask = diff_dias.isna()
 
     if tipo_match == "desaparecidos":
@@ -446,8 +446,8 @@ def _match_fub_r(
         matched[col_b_fecha_hechos], matched.get("fecha_hechos_rnpdno"), tipo_match="desaparecidos"
     )
     matched["diferencia_dias_desaparicion"] = (
-        pd.to_datetime(matched[col_b_fecha_hechos], errors="coerce")
-        - pd.to_datetime(matched.get("fecha_hechos_rnpdno"), errors="coerce")
+        pd.to_datetime(matched[col_b_fecha_hechos], errors="coerce", utc=True)
+        - pd.to_datetime(matched.get("fecha_hechos_rnpdno"), errors="coerce", utc=True)
     ).dt.days
 
     matched = matched.drop(columns=["_clave_fub"], errors="ignore")
@@ -579,8 +579,8 @@ def _match_curp_r(
         tipo_match="desaparecidos",
     )
     all_matched["diferencia_dias_desaparicion"] = (
-        pd.to_datetime(all_matched[col_b_fecha_hechos], errors="coerce")
-        - pd.to_datetime(all_matched.get("fecha_hechos_rnpdno"), errors="coerce")
+        pd.to_datetime(all_matched[col_b_fecha_hechos], errors="coerce", utc=True)
+        - pd.to_datetime(all_matched.get("fecha_hechos_rnpdno"), errors="coerce", utc=True)
     ).dt.days
 
     print(f"  > Matches por CURP: {len(all_matched)}")
@@ -629,7 +629,7 @@ def _validar_match_nombre_r(row: pd.Series, tipo: str = "desaparecidos") -> bool
     diff_hchos: int | None = None
     if pd.notna(fha_hchos_b) and pd.notna(fecha_hchos_r):
         try:
-            diff_hchos = abs((pd.to_datetime(fha_hchos_b) - pd.to_datetime(fecha_hchos_r)).days)
+            diff_hchos = abs((pd.to_datetime(fha_hchos_b, utc=True) - pd.to_datetime(fecha_hchos_r, utc=True)).days)
         except Exception:
             pass
 
@@ -637,7 +637,7 @@ def _validar_match_nombre_r(row: pd.Series, tipo: str = "desaparecidos") -> bool
     diff_nac: int | None = None
     if pd.notna(fha_nac_b) and pd.notna(fecha_nac_r):
         try:
-            diff_nac = abs((pd.to_datetime(fha_nac_b) - pd.to_datetime(fecha_nac_r)).days)
+            diff_nac = abs((pd.to_datetime(fha_nac_b, utc=True) - pd.to_datetime(fecha_nac_r, utc=True)).days)
         except Exception:
             pass
 
@@ -778,8 +778,8 @@ def _match_nombre_r(
 
     # verif_fecha_nac: coincide si |diff| ≤ 5 días
     diff_nac = (
-        pd.to_datetime(matched[col_b_fha_nac], errors="coerce")
-        - pd.to_datetime(matched.get("fecha_nacimiento_rnpdno"), errors="coerce")
+        pd.to_datetime(matched[col_b_fha_nac], errors="coerce", utc=True)
+        - pd.to_datetime(matched.get("fecha_nacimiento_rnpdno"), errors="coerce", utc=True)
     ).abs().dt.days
     matched["verif_fecha_nac"] = np.where(
         diff_nac.notna() & (diff_nac <= 5),
@@ -814,8 +814,8 @@ def _match_nombre_r(
         matched[col_b_fecha_hechos], matched.get("fecha_hechos_rnpdno"), tipo_match="desaparecidos"
     )
     matched["diferencia_dias_desaparicion"] = (
-        pd.to_datetime(matched[col_b_fecha_hechos], errors="coerce")
-        - pd.to_datetime(matched.get("fecha_hechos_rnpdno"), errors="coerce")
+        pd.to_datetime(matched[col_b_fecha_hechos], errors="coerce", utc=True)
+        - pd.to_datetime(matched.get("fecha_hechos_rnpdno"), errors="coerce", utc=True)
     ).dt.days
 
     print(f"  > Matches por Nombre: {len(matched)}")
