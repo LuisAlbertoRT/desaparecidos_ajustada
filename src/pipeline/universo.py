@@ -233,8 +233,8 @@ class Universo:
         ini, fin = self.cfg.rango_periodo(s.periodo)
         fechas = (self.rn if frame == "rn" else self.ba)[self.columna(frame, "fecha")]
         f_min, f_max = fechas.min(), fechas.max()
-        desde = f_min if ini is None else max(pd.Timestamp(ini), f_min)
-        hasta = f_max if fin is None else min(pd.Timestamp(fin) - pd.Timedelta(days=1), f_max)
+        desde = f_min if ini is None else max(pd.Timestamp(ini, tz="UTC"), f_min)
+        hasta = f_max if fin is None else min(pd.Timestamp(fin, tz="UTC") - pd.Timedelta(days=1), f_max)
         return desde, hasta
 
     def _mascara_periodo(self, nombre_frame: str, periodo: str) -> np.ndarray:

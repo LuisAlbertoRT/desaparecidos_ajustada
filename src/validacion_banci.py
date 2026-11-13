@@ -78,7 +78,7 @@ def _texto(s: pd.Series) -> pd.Series:
 def _inicio_valido(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     """Fechas de inicio, y las que caen después de hoy (errores de captura)."""
     ini = _fechas(df["fha_de_ini"])
-    futuras = ini > pd.Timestamp(datetime.now().date())
+    futuras = ini > pd.Timestamp(datetime.now().date(), tz="UTC")
     return ini.where(~futuras), ini[futuras]
 
 
@@ -175,7 +175,7 @@ def validar(df: pd.DataFrame, archivo, referencia: Optional[dict] = None,
 
     if res["fecha_corte"]:
         hechos = _fechas(df["fha_de_hchos"])
-        futuras = int((hechos > pd.Timestamp(res["fecha_corte"])).sum())
+        futuras = int((hechos > pd.Timestamp(res["fecha_corte"], tz="UTC")).sum())
         if futuras:
             avisos.append(f"{futuras:,} fechas de hechos posteriores al corte "
                           f"({res['fecha_corte']}); el notebook les resta años.")

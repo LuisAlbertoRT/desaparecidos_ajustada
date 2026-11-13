@@ -474,7 +474,7 @@ def _universo_rnpdno(rn: pd.DataFrame, cfg: Settings, verbose: bool = True) -> p
     descarta, pero hoy no hay ninguna y mantenerlas no puede encoger el universo en
     silencio si un corte futuro las trae.
     """
-    corte = pd.Timestamp(cfg.fecha_sexenio)
+    corte = pd.Timestamp(cfg.fecha_sexenio, tz="UTC")
     col_clasif = _primera(rn, ["clasificacion_des_derivada_rnpdno", "clasificacion_des"])
     col_fecha = columna_fecha_periodo(rn, verbose)
 
