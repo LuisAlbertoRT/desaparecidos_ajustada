@@ -184,7 +184,7 @@ def agrupar_por_mes(df: pd.DataFrame, col_fecha: str, columnas=None,
             f"agrupación; pasa otro `nombre_mes` o `nombre_conteo`."
         )
 
-    fechas = pd.to_datetime(df[col_fecha], errors="coerce", utc=True)
+    fechas = pd.to_datetime(df[col_fecha], errors="coerce")
     validas = fechas.notna()
     sin_fecha = int((~validas).sum())
 
@@ -197,7 +197,7 @@ def agrupar_por_mes(df: pd.DataFrame, col_fecha: str, columnas=None,
                 .size()                            # cartesiano de categóricas
                 .reset_index(name=nombre_conteo))
 
-    extremos = [pd.Timestamp(f, tz="UTC").to_period("M").to_timestamp()
+    extremos = [pd.Timestamp(f).to_period("M").to_timestamp()
                 for f in (desde, hasta) if f is not None]
     if not out.empty:
         extremos += [out[nombre_mes].min(), out[nombre_mes].max()]

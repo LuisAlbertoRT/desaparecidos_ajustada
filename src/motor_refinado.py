@@ -651,7 +651,7 @@ def _norm_nombre_llave(s) -> str:
 def _norm_fecha_llave(s) -> str:
     """Fecha a 'YYYY-MM-DD' ('' si no es interpretable). Los archivos de revisión la
     traen a veces como '2008-05-01' y a veces como '2008-05-01 00:00:00'."""
-    d = pd.to_datetime(str(s)[:10], errors="coerce", utc=True)
+    d = pd.to_datetime(str(s)[:10], errors="coerce")
     return "" if pd.isna(d) else d.strftime("%Y-%m-%d")
 
 
@@ -973,8 +973,8 @@ def _folio_limpio_status(
 
 def _fhechos_dias(a: dict, b: dict) -> Optional[int]:
     """Diferencia en días entre fechas de hechos. None si falta o es inválida."""
-    da = pd.to_datetime(str(a.get("fhec", ""))[:10], errors="coerce", utc=True)
-    db = pd.to_datetime(str(b.get("fhec", ""))[:10], errors="coerce", utc=True)
+    da = pd.to_datetime(str(a.get("fhec", ""))[:10], errors="coerce")
+    db = pd.to_datetime(str(b.get("fhec", ""))[:10], errors="coerce")
     if pd.isna(da) or pd.isna(db):
         return None
     return abs((da - db).days)
