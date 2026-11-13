@@ -482,5 +482,5 @@ def limpiar_cache(cfg: Settings, nivel: str = "todo") -> None:
 def _max_fecha(df: pd.DataFrame, col: str) -> Optional[str]:
     if col not in df.columns:
         return None
-    v = pd.to_datetime(df[col], errors="coerce").max()
+    v = pd.to_datetime(df[col], errors="coerce", utc=True).max()
     return v.strftime("%Y-%m-%d") if pd.notna(v) else None

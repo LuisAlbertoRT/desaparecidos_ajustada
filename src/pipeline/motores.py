@@ -501,7 +501,7 @@ def _universo_rnpdno(rn: pd.DataFrame, cfg: Settings, verbose: bool = True) -> p
                           f"a CLASIF_UNIVERSO en src/pipeline/motores.py.")
         mask &= dentro
     if col_fecha:
-        dt = pd.to_datetime(rn[col_fecha], errors="coerce")
+        dt = pd.to_datetime(rn[col_fecha], errors="coerce", utc=True)
         mask &= (dt >= corte) | dt.isna()
     return rn[mask].copy()
 

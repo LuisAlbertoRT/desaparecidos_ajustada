@@ -65,9 +65,9 @@ MINIMO_BAJA_ENTIDAD = 10       # …y al menos estos registros
 
 def _fechas(s: pd.Series) -> pd.Series:
     """Fechas como vengan: fecha de Excel, texto o número de serie de Excel."""
-    f = pd.to_datetime(s, errors="coerce")
+    f = pd.to_datetime(s, errors="coerce", utc=True)
     num = pd.to_numeric(s, errors="coerce")
-    serie = pd.to_datetime(num, unit="D", origin="1899-12-30", errors="coerce")
+    serie = pd.to_datetime(num, unit="D", origin="1899-12-30", errors="coerce", utc=True)
     return f.where(f.notna(), serie.where(num.between(1, 100_000)))
 
 
