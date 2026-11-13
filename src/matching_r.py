@@ -245,9 +245,9 @@ def preparar_banci_r(
 
     # ---------- Filtro de fechas ----------
     if fecha_inicio and col_b_fecha_hechos in df.columns:
-        df = df[df[col_b_fecha_hechos] >= pd.to_datetime(fecha_inicio)]
+        df = df[df[col_b_fecha_hechos] >= pd.to_datetime(fecha_inicio, utc=True)]
     if fecha_fin and col_b_fecha_hechos in df.columns:
-        df = df[df[col_b_fecha_hechos] < pd.to_datetime(fecha_fin)]
+        df = df[df[col_b_fecha_hechos] < pd.to_datetime(fecha_fin, utc=True)]
 
     if df.empty:
         print("  > ⚠️ BANCI vacío tras filtros.")

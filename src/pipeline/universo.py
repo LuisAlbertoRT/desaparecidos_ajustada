@@ -256,9 +256,9 @@ class Universo:
         if ini is not None or fin is not None:
             nulas = fecha.isna().to_numpy()
             if ini is not None:
-                mask &= (fecha >= pd.to_datetime(ini)).to_numpy() | nulas
+                mask &= (fecha >= pd.to_datetime(ini, utc=True)).to_numpy() | nulas
             if fin is not None:
-                mask &= (fecha < pd.to_datetime(fin)).to_numpy() | nulas
+                mask &= (fecha < pd.to_datetime(fin, utc=True)).to_numpy() | nulas
         self._cache_periodos[llave] = mask
         return mask
 

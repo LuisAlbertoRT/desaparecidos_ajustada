@@ -246,10 +246,10 @@ def preparar_rnpdno(df_rnpdno, fecha_inicio=None, fecha_fin=None):
     if 'fecha_hechos_modificada' in df.columns:
         if fecha_inicio:
             print(f"  > Filtrando fecha_hechos_modificada >= {fecha_inicio} (incluyendo registros sin fecha)")
-            df = df[(df['fecha_hechos_modificada'] >= pd.to_datetime(fecha_inicio)) | (df['fecha_hechos_modificada'].isna())]
+            df = df[(df['fecha_hechos_modificada'] >= pd.to_datetime(fecha_inicio, utc=True)) | (df['fecha_hechos_modificada'].isna())]
         if fecha_fin:
             print(f"  > Filtrando fecha_hechos_modificada < {fecha_fin}")
-            df = df[(df['fecha_hechos_modificada'] < pd.to_datetime(fecha_fin)) | (df['fecha_hechos_modificada'].isna())]
+            df = df[(df['fecha_hechos_modificada'] < pd.to_datetime(fecha_fin, utc=True)) | (df['fecha_hechos_modificada'].isna())]
     else:
         print("  > ⚠️ Advertencia: No se encontró 'fecha_hechos_modificada'. Asegúrate de haber corrido el ETL completo.")
         
