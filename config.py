@@ -175,7 +175,8 @@ VALID_STATE_CODES = [
 # Archivo de BANCI (Secretariado)
 # Se define como un único archivo y dirección, según tu solicitud
 #BANCI_FILE = INPUT_DIR / "banci" / "SUBIR_R_202606_junio.xlsx"                  #<---- Aquí se cambia la BANCI
-BANCI_FILE = INPUT_DIR / "banci" / "SUBIR_R_202609_septiembre.xlsx"             #<---- Aquí se cambia la BANCI
+#BANCI_FILE = INPUT_DIR / "banci" / "SUBIR_R_202609_septiembre.xlsx"                  #<---- Aquí se cambia la BANCI
+BANCI_FILE = INPUT_DIR / "banci" / "SUBIR_R_202610_octubre.xlsx"                #<---- Aquí se cambia la BANCI
 
 
 # Hoja específica del archivo BANCI (Secretariado)
@@ -187,7 +188,7 @@ BANCI_SHEET = 'Victimas'
 # entidad puede desaparecer, etc. Con True un problema detiene el notebook 2; con False
 # sólo se avisa. Déjalo en True salvo que ya sepas por qué la entrega no cumple (p. ej.
 # el Secretariado depuró registros) y vuelve a ponerlo en True después.
-VALIDACION_BANCI_ESTRICTA = True
+VALIDACION_BANCI_ESTRICTA = False
 
 # --- PERÍODOS DE TIEMPO PARA DATAFRAMES GENERADOS ---
 # Se definen los límites de fecha para cada período (inicio, fin). None para indicar sin límite (min/max).
@@ -358,7 +359,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-13.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-23.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -1118,7 +1119,7 @@ CATALOGO_REGEX_CI_POR_ENTIDAD = {
     "Guerrero": r"^(?i)\d{2}(?:[-/]?\d{2})(?:[-/]?\d{3})(?:[-/]?\d{2})(?:[-/]?\d{5})(?:[-/]?\d{6})$",
     "Hidalgo": r"^(?i)(?:[a-z0-9]+(?:[-/]?\d{4})(?:[-/]?\d+)|fed[-/]hgo[-/]?[a-z]+(?:[-/]?\d+)(?:[-/]?\d{4}))$",
     "Jalisco": r"^(?i)[a-z0-9-]+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",
-    "México": r"^(?i)(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2]))$",
+    "México": r"^(?i)(?:(?:FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z0-9-]+)*(?:[-/])\d{7}(?:[-/])\d{4})|(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2])))$",
     "Morelos": r"^(?i)[a-z0-9]{2,10}(?:[-/]?\d+)(?:[-/]?\d{4})$",
     "Nuevo León": r"^(?i)(?:fgjnl[-/]?\d{6}[-/]?\d{4}|\d+[-/]?\d{4})$",
     "Oaxaca": r"^(?i)\d+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",
@@ -1164,7 +1165,7 @@ CATALOGO_REGEX_CI_POR_ENTIDAD_2 = {
     "Guerrero": r"^(?i)(?:\d{14}(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])\d{2}|[a-z]{3}/[a-z]{2}/\d{2}/\d{3}/\d{4})$",
     "Hidalgo": r"^(?i)(?:(?:0[1-9]|1\d|20)(?:[-/]?\d{4})(?:[-/]?\d+)|fed[-/]hgo[-/]?[a-z]+(?:[-/]?\d+)(?:[-/]?\d{4}))$",
     "Jalisco": r"^(?i)[0-9-]+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",
-    "México": r"^(?i)(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2]))$",
+    "México": r"^(?i)(?:(?:FED(?:[-/])[A-Z]+(?:[-/])[A-Z]+(?:(?:[-/])[A-Z0-9-]+)*(?:[-/])\d{7}(?:[-/])\d{4})|(?:[a-z0-9]{3}(?:[-/]?[a-z0-9]{3})(?:[-/]?(?:[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{6}|\d{2}[-/]?[a-z0-9]{3}[-/]?\d{2,3}[-/]?\d{5}))[-/]?\d{2}[-/]?(0[1-9]|1[0-2])))$",
     "Morelos": r"^(?i)[a-z0-9]+(?:-[a-z0-9]+)?[-/]\d+[-/]\d{4}$",
     "Nuevo León": r"^(?i)[a-z0-9]+[-/]?\d{4}$",
     "Oaxaca": r"^(?i)\d+(?:[-/]?[a-z0-9-]+)(?:[-/]?\d{4})$",

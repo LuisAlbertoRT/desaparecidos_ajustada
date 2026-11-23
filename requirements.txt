@@ -4,6 +4,13 @@ python-dotenv
 openpyxl
 pyjanitor
 pyarrow
+matplotlib
+python-pptx
+psutil
+Unidecode
+jupyterlab
+ipykernel
+nbstripout
 google-api-python-client
 google-auth
 google-auth-oauthlib
