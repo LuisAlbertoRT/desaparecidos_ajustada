@@ -1,0 +1,312 @@
+---
+output:
+  pdf_document: 
+    number_sections: true # Le dice a Pandoc y LaTeX que enumere automáticamente los encabezados de Markdown (#, ##, ###).
+  word_document: default
+  html_document:
+    df_print: paged
+lang: es # Define el idioma
+header-includes: # Inclusión de paquetes de LaTeX para PDF
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+- \usepackage[absolute,overlay]{textpos}
+- \usepackage{tocloft}             # Necesario para modificar el ToC
+- \AtBeginDocument{\renewcommand{\contentsname}{}} # anula la traducción de babel. Nos sirve para quitar el título que se crea al correr \tableofcontents
+---
+
+```{r setup, include=FALSE}
+# Configuración de los bloques de código
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, comment = "#")
+```
+
+---
+# Portada
+---
+
+\begin{center}
+\LARGE \textbf{Documentación del código para la cuarta confronta: voto INE 2024}
+\end{center}
+\vspace{3cm}
+
+\begin{center}
+\LARGE \text{Documentación del código}
+\\
+\vspace{0.5cm}
+\text{Autora: Jocelyn Rocha}
+\end{center}
+\vspace{4cm}
+
+\begin{center}
+\LARGE
+\textbf{Fecha de actualización:}\ 06 de noviembre de 2025.
+\end{center}
+
+\newpage
+
+---
+# Índice 
+---
+
+\newpage
+\normalsize
+
+\addtocontents{toc}{\protect\thispagestyle{empty}}
+\begin{center}
+\textbf{\LARGE Índice}
+\end{center}
+
+\vspace{0.5cm}
+
+\tableofcontents
+
+---
+# Cuerpo del documento 
+---
+
+\newpage
+\pagenumbering{arabic}
+
+::: text-justify 
+
+# Descripción general del código
+
+Script: confronta_voto_INE_2024.Rmd
+
+Objetivo del código: el INE recibió información sobre personas desaparecidas y no localizadas por parte de la ATDT. Después, el INE rastreó las curps de estas personas para conocer si tuvieron un registro de votación durante el ejercicio electoral de 2024. Mandaron este nuevo insumo a la ATDT con fecha de corte al 14 de octubre de 2025. Adicionalmente, también se cuenta con información acerca trámites, realizados por la persona desaparecida en cuestión, en el INE. Por último, en algunos casos, se tiene conocimiento si la persona está dada de baja en el INE (ver \texttt{situacion\_ine}), un evento independiente de los trámites en el INE.
+
+\textbf{Proceso:}
+
+Primero debemos verificar si todas las personas desaparecidas del nuevo insumo no han sido todavía localizadas. El análisis se realiza casi un mes después, el 03 de noviembre de 2025, por lo que es posible que algunas personas desaparecidas de aquel entonces ya hayan sido localizadas.
+
+Segundo, debemos solo filtrar a aquellas personas, con marca de voto, que tienen fecha de desaparición anterior al 01 de enero de 2024 (ver \texttt{voto\_2024}). En la sección \texttt{1.1 Consideraciones} se explica el motivo de esta decisión.
+
+Tercero, es importante registrar a las personas que cuentan con registro de trámite en el INE (ver \texttt{localizado}, \texttt{fecha\_tramite} y \texttt{tipo\_tramite})(solo válido si y solo si la fecha de desaparición es anterior al trámite). 
+
+Cuarto, se agrega la condición de que si la persona está dada de baja en el INE por motivo de perdida de vigencia (es decir, si \texttt{tipo\_baja\_ine %in% "PERDIDA DE VIGENCIA"} se cumple), entonces \textbf{no} se considera indicio de vida (adicionalmente, ver \texttt{fecha\_baja}).
+
+Por último, la baja en el portal del INE puede considerarse un indicio de vida \textbf{solo en ciertos casos}. Si el motivo de este trámite de baja responde a una suspensión, es posible que la persona desaparecida haya enfrentado un proceso judicial. Asimismo si la baja se debió a la pérdida de nacional, esto puede indicar que la persona pudo haber salido del país. 
+
+La \textbf{base de datos} que se utilizó fue: \texttt{fubs\_con\_voto\_INE.xlsx}.
+
+## Consideraciones
+
+Solo se considera que una persona tiene indicio de vida si cumple:
+
+\begin{enumerate}
+  \item El valor en la columna \texttt{voto\_2024} es "Ciudadano con marca de voto".
+  \item La fecha de desaparición de la persona es anterior al 01 de enero de 2024; esto debido a que no es posible saber con exactitud la fecha de votación de la persona desaparecida.
+  \item La fecha del trámite en el INE debe ser estrictamente posterior a la fecha de desaparición de la persona.
+  \item Si la persona está dada de baja del INE debido a una perdida de vigencia (es decir, si \texttt{tipo\_baja\_ine \%in\% "PERDIDA DE VIGENCIA"} se cumple), entonces \textbf{no} se considera indicio de vida.
+  \item La fecha de baja del inte debe ser estrictamente posterior a la fecha de desaparición.
+\end{enumerate}
+
+# Limpieza, instalación de paquetes, librerías, lectura de las bases de datos y ajustes de algunas variables de interés.
+```{r}
+rm(list = ls())
+
+pacman::p_load(readr, tidiverse, dplyr, readxl, purrr, ggplot2,
+               scales, magrittr, stringi, stringr, tsibble, lubridate, janitor,
+               here, tinytex)
+```
+
+## Cargamos funciones, catálogos y paquetes
+```{r}
+# función para manipular en R la base del rnpdno actualizada
+source(here::here("RNPDNO", "scripts",
+                  "segundo_paso_funcion_rnpdno_actualizado_para_su_uso_en_r.R"))
+
+# Funciones y variables importantes para análisis posteriores ----
+
+# Para el análisis por entidad federativa
+idestado = 1:33
+
+# Nombres oficiales correctos, con mayúsculas y acentos
+entidad = c(
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
+  "Coahuila de Zaragoza", "Colima", "Chiapas", "Chihuahua", "Ciudad de México",
+  "Durango", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Estado de México",
+  "Michoacán de Ocampo", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
+  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco",
+  "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán",
+  "Zacatecas", "Se Desconoce"
+)
+
+# Crear el dataframe
+catalogo_estados = data.frame(idestado, entidad)
+
+# Catálogo INEGI ----
+
+# Función INEGI
+source(here::here("Confrontas", "scripts", "funcion_inegi", "funcion_inegi.R"))
+```
+
+
+## Lectura de las bases de datos 
+```{r}
+# Cambiar el parámetro de la función para cargar base final de diferente corte
+base_total_rellenada = procesamiento_base_final("2025-11-28")
+
+nrow(base_total_rellenada)
+# Para el 03 de noviembre de 2025 hubo 382,159 observaciones
+# Para el 06 de noviembre de 2025 hubo 382,827 observaciones
+# Para el 10 de noviembre de 2025 hubo 383,206 observaciones
+# Para el 28 de noviembre de 2025 hubo 385,257 observaciones
+
+# Confronta de datos del INE
+ine_votaciones = read_xlsx(here::here("Confrontas", "input",
+                                      "cuarta_confronta_voto_INE_2024",
+                                      "fubs_con_voto_INE.xlsx"),
+                           skip = 1) |> 
+  clean_names()
+
+colnames(ine_votaciones)
+```
+
+# Preparación de datos
+
+Sobre imputación de fecha de localización: en casos donde \textbf{no} se cuente con este dato, se opta por remplazarlo por la fecha de desaparición de la persona en cuestión. Esto motivado por el hecho de que una gran parte de los casos de las desapariciones que terminan en localización, esta sucede el mismo mes de la desaparición.
+
+```{r}
+# Imputar fecha de localización igual a fecha de desaparición
+base_total_rellenada <- base_total_rellenada |> 
+  mutate(fechalocaliza_imputada = if_else(
+    is.na(fechalocaliza) & clasificacion_des == "Localizados", 
+    fecha_hechos_modificada, 
+    fechalocaliza
+  ))
+
+# Posteriormente, quitaremos del análisis a las personas que, 
+# aunque estuvieron desaparecidas al 14 de octubre de 2025, 
+# a la fecha de corte de hoy ya han sido localizadas.
+
+# Tomamos un subconjunto
+# Solo tomamos aquellas personas localizadas
+base_total_localizados <- base_total_rellenada |> 
+  filter(clasificacion_des == "Localizados") |> 
+  mutate(nombre_concat = paste0(nombre_vic, " ", 
+                                primerapellido_vic, " ",
+                                segundoapellido_vic)) |> 
+  select(fub, estatus, nombre_concat, fechalocaliza_imputada,
+         indicadora_dependencia_localiza = indicadora_dependencia, indicadora_curp_valida) |>
+  mutate(inicadora_localizados_rnpdno = "localizado")
+
+# Limpiar columnas de ine_votaciones
+# str(ine_votaciones)
+ine_votaciones <- ine_votaciones |> 
+  mutate(across(c(fechanacimiento, fechahechos, fechacaptura, 
+                  fechapercato, fecha_tramite, fecha_baja), ~ as.Date(.x)))
+
+# Agregar sufijo de datos del INE (inician a partir de la columna 15)
+ine_votaciones <- ine_votaciones |> 
+  rename_with(~ paste0(.x, "_ine"), .cols = 15:last_col())
+
+# En caso de 
+# Agregamos fecha_modificada para posteriores análisis
+ine_votaciones <- ine_votaciones |> 
+  mutate(fecha_hechos_modificada = coalesce(fechahechos,
+                                            fechapercato,
+                                            fechacaptura))
+```
+
+# Descartamos a las personas que ya han sido localizadas
+```{r}
+# Unimos base de votos con las personas localizadas en rnpdno
+ine_votaciones <- ine_votaciones |> 
+  left_join(base_total_localizados, by = "fub", suffix =  c("", "_rnpdno_10112025"))
+
+# ine_votaciones |> count(inicadora_localizados_rnpdno) |> View() 
+# se han localizado 2,709 --desaparecidas al 14 de octubre-- 
+# al 03 de nov de 2025.
+
+# Se han localizado 3,336 --desaparecidas al 14 de octubre-- al 28 de nov de 2025.
+
+# Remover aquellas personas localizadas
+ine_votaciones_sin_localizados <- ine_votaciones |> 
+  filter(is.na(inicadora_localizados_rnpdno)) |> 
+  select(-c(estatus, nombre_concat, fechalocaliza_imputada, 
+            indicadora_dependencia_localiza, indicadora_curp_valida,
+            inicadora_localizados_rnpdno))
+
+# Personas desaparecidas que fueron a votar
+# ine_votaciones_sin_localizados |> count(voto_2024_ine) |> View()
+
+# En total tenemos a 7,109 con marca de voto
+```
+
+# Indicadores de indicios de vida en voto INE 2024, trámite en INE y tipo de baja del INE
+```{r}
+# ---- Voto INE 2024 ----
+# Buscamos solo a las personas desaparecidas antes de 2024 
+# (solo de estas podemos asegurarnos que su voto en 2024 
+# cuenta como indicio de vida).
+
+# Añadimos un indicador de solo aquellas personas que 
+# tienen fecha de desaparición anterior al 01 de enero de 2025
+ine_votaciones_sin_localizados_mas_voto <- 
+  ine_votaciones_sin_localizados |> 
+  mutate(ind_voto2024 = case_when(
+    fecha_hechos_modificada < as.Date("2024-01-01") &
+    voto_2024_ine == "Ciudadano con marca de voto" ~ 1,
+    TRUE ~ 0
+  ))
+
+# ---- Trámite en el INE ----
+# Añadimos un indicador si el trámite del INE (indicado en localizado_ine)
+# es ESTRICTAMENTE posterior a la desaparicion
+ine_votaciones_sin_localizados_mas_voto <- ine_votaciones_sin_localizados_mas_voto |> 
+  mutate(ind_tramite_ine = case_when(
+    fecha_hechos_modificada < fecha_tramite_ine &
+    str_detect(localizado_ine, "LOCALIZADO") ~ 1,
+    TRUE ~ 0
+  ))
+
+# ---- Dada de baja del INE 2024 ----
+# Debemos filtrar las personas dadas de baja del INE por motivo de pérdida de vigencia 
+ine_votaciones_sin_localizados_mas_voto <- ine_votaciones_sin_localizados_mas_voto |> 
+  filter(!tipo_baja_ine %in% "PERDIDA DE VIGENCIA")
+
+# Solo si el trámite de baja es posterior a la fecha de desaparición
+ine_votaciones_sin_localizados_mas_voto <- 
+  ine_votaciones_sin_localizados_mas_voto |> 
+  mutate(ind_baja_ine_suspension_perdida_nacionalidad =
+           case_when(fecha_hechos_modificada < fecha_baja_ine &
+                    (tipo_baja_ine %in% c("SUSPENSION", "PERDIDA DE NACIONALIDAD")) ~ 1,
+                    TRUE ~ 0))
+
+# Suma de personas que cumplen con indicador de voto 2024 válido
+sum(ine_votaciones_sin_localizados_mas_voto$ind_voto2024 == 1)
+# 4,586 para corte de 06 de noviembre. 
+# 4,527 para corte de 28 de noviembre. 
+
+# Suma de personas que cumplen con indicador de trámite válido
+sum(ine_votaciones_sin_localizados_mas_voto$ind_tramite_ine == 1)
+# 15,838
+
+# Suma de personas que cumplen con indicador de baja del INE
+sum(ine_votaciones_sin_localizados_mas_voto$ind_baja_ine_suspension_perdida_nacionalidad == 1)
+# 308
+
+# ---- Solo nos quedamos con personas con al menos UN INDICADOR VÁLIDO ----
+ine_votaciones_sin_localizados_mas_voto <- 
+  ine_votaciones_sin_localizados_mas_voto |> 
+  filter(ind_voto2024 == 1 |
+         ind_tramite_ine == 1 |
+         ind_baja_ine_suspension_perdida_nacionalidad == 1)
+```
+
+# Guardamos cuarta confronta
+```{r}
+# Renombramos
+cuarta_confronta <- ine_votaciones_sin_localizados_mas_voto
+
+# Eliminamos extra
+rm(ine_votaciones_sin_localizados_mas_voto)
+
+# Guardamos
+writexl::write_xlsx(cuarta_confronta,
+                    here::here("Confrontas", "output", "cuarta_confronta_voto_INE_2024",
+                               "cuarta_confronta_28112025.xlsx"))
+```
+
+

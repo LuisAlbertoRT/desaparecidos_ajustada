@@ -1,0 +1,1196 @@
+---
+lang: es
+format:
+  pdf:
+    number-sections: true
+    toc: false 
+    header-includes:
+      - \usepackage{mathptmx} # Paquete estándar para Times New Roman
+      - \addtokomafont{disposition}{\rmfamily} # quita el estilo "Sans Serif" de los títulos y los pone en la misma fuente que el cuerpo (Times)
+      - \usepackage{pdflscape}
+      - \newcommand{\blandscape}{\begin{landscape}}
+      - \newcommand{\elandscape}{\end{landscape}}
+      - \usepackage[absolute,overlay]{textpos}
+      - \usepackage{tocloft}
+      - \AtBeginDocument{\renewcommand{\contentsname}{}}
+  html:
+    df-print: paged
+  docx: default
+execute:
+  eval: false # No ejecutar código
+knitr:
+  opts_knit:
+    root.dir: "c:/Agencia de Transformación Digital Proyectos/Personas_desaparecidas"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  warning = FALSE, 
+  message = FALSE, 
+  comment = ""     # <--- Deja esto vacío o usa "##"
+)
+```
+
+---
+# Portada
+---
+
+\begin{center}
+\LARGE \textbf{Documentación del código para el análisis de todas las confrontas históricas del RNPDNO con otras instituciones}
+\end{center}
+\vspace{3cm}
+
+\begin{center}
+\LARGE \text{Documentación del código}
+\\
+\vspace{0.5cm}
+\text{Autora: Jocelyn Rocha}
+\end{center}
+\vspace{4cm}
+
+\begin{center}
+\LARGE
+\textbf{Fecha de actualización:}\ Febrero de 2026.
+\end{center}
+
+\newpage
+
+---
+# Índice 
+---
+
+\newpage
+\normalsize
+
+\addtocontents{toc}{\protect\thispagestyle{empty}}
+\begin{center}
+\textbf{\LARGE Índice}
+\end{center}
+
+\vspace{0.5cm}
+
+\tableofcontents
+
+---
+# Cuerpo del documento 
+---
+
+\newpage
+\pagenumbering{arabic}
+
+# Descripción general del código
+
+Script: `analisis_de_todas_las_confrontas.R`
+
+Objetivos: 
+
+1. Generar un archivo de R que contenga la información de personas desaparecidas, según el RNPDNO, que registran indicios de vida (es decir, que han aparecido en las confrontas que ha hecho la Agencia con cualquier otra institución). Adicionalmente, se deben de recuperar los números de contacto (estos se obtienen de algunas confrontas) que tenemos de estas personas.
+
+2. Actualizar la ppt "actualización_PPT_estatus_RNPDNO" (que ya debe tener los datos actualizados acerca del conteo de personas desaparecidas y personas localizadas)
+
+Fecha última de actualización: 30 de noviembre de 2025
+
+Las \textbf{bases de datos} que se utilizarán para este código son:
+
+\begin{enumerate}
+    \item \textbf{Pre-confronta} (cruce\_todo\_202505271127\_InstitucionesConfronta.csv): contiene columna de actas de defunción según el RENAPO.
+    \item \textbf{Primera confronta} Tenemos \textbf{dos archivos}. El primero (tabla\_informacion\_contacto\_2.xlsx) contiene información de la primera confronta con varias instituciones; a saber, Renapo, Consar, SAT, RND, RNIP, de Bienestar, Vivesalud, REPUVE, SRE, registros de vacunas y de becas e IMSS. El segundo archivo (primera\_confronta.xlsx) resguarda la misma información que el anterior pero con dummies en las variables de otras instituciones.
+    \item \textbf{Segunda confronta} (segunda\_confronta\_depurada.xlsx): este documento contiene información de la primera confronta con varias instituciones; a saber, la Secretaría de Intraestructura, Telecomunicaciones y Transportes (SICT), IMSS, SAT, ISSSSTE, Secretaría de Bienestar, Instituto Mexicano de Migración (INAMI), la SRE, etc.
+    \item \textbf{Tercera confronta} (base\_contactos\_confrontas\_segunda\_version\_14102025.xlsx): este documento contiene información de la confronta con el INE, con instituciones bancarias, adicionalmente, se tiene el registro si la persona desaparecida fue llamada en una confronta anterior.
+    \item \textbf{Cuarta confronta} (cuarta\_confronta\_28112025.xlsx): aquí se encuentra información que recolectó el INE sobre personas desaparecidas o no localizadas, se divide en tres categorías: 1. personas con marca de voto en 2024 (solo consideramos a las personas cuya fecha de desaparición es anterior al 01 de enero de 2024), 2. personas con registro de trámite en el INE (con fecha de desaparición estrictamente menor a la fecha del trámite) y 3. personas dadas de baja del padrón electoral del INE por suspensión o pérdida de nacionalidad (con fecha de desaparición estrictamente menor a la fecha de baja del INE). Estos tres casos son considerados indicios de vida.
+\end{enumerate}
+
+## Pasos a seguir en el tratamiento de cada confronta
+\begin{enumerate}
+  \item Eliminar duplicados de curps (las personas con indicios deben ser únicas) y verificar que estas sean válidas.
+  \item Eliminar duplicados de fubs.
+  \item Crear una columna única de números de teléfono (estos son los números de contacto de la persona).
+\end{enumerate}
+
+# Limpieza, instalación de librerías
+```{r}
+rm(list = ls())
+
+pacman::p_load(readr, tidyverse, dplyr, lubridate, openxlsx, janitor,
+               here)
+```
+
+# Descarga de funciones
+```{r}
+# Función de decarga de base de datos del RNPDNO actualizada
+source(here::here("RNPDNO", "scripts",
+       "funcion_base_final_procesada.R"))
+
+# Regex usadas en la validación de curps
+curp_regex <- "^[A-Z]{4}\\d{6}[HM]"
+curp_regex2 <- "[A-Z]{3}.{2}$"
+
+# Códigos de estado válidos en las curps
+codigos_validos_curp <- c(
+  "AS", "BC", "BS", "CC", "CL", "CM", "CS", "CH", "DF", "DG", "GT", "GR",
+  "HG", "JC", "MC", "MN", "MS", "NT", "NL", "OC", "PL", "QT", "QR", "SP",
+  "SL", "SR", "TC", "TS", "TL", "VZ", "YN", "ZS", "NE")
+
+es_curp_valida <- function(curp) {
+  grepl(curp_regex, curp, ignore.case = TRUE) &
+    grepl(curp_regex2, curp, ignore.case = TRUE) &
+    nchar(curp) == 18 &
+    substr(curp, 12, 13) %in% codigos_validos_curp
+}
+
+idestado <- 1:33
+
+# Nombres oficiales correctos, con mayúsculas y acentos
+entidad <- c(
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
+  "Coahuila de Zaragoza", "Colima", "Chiapas", "Chihuahua", "Ciudad de México",
+  "Durango", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Estado de México",
+  "Michoacán de Ocampo", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
+  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco",
+  "Tamaulipas", "Tlaxcala", "Veracruz de Ignacio de la Llave", "Yucatán",
+  "Zacatecas", "Se Desconoce"
+)
+
+reemplazo_acentos <- function(x){
+  x <- x |>  toupper()
+  x <- x |>  trimws()
+  x <- str_replace_all(
+    x,
+    c("Á" = "A", "É" = "E", "Í" = "I", "Ó" = "O", "Ú" = "U")
+  )
+  return(x)
+}
+
+# Crear el dataframe
+catalogo_estados <- data.frame(idestado, entidad, entidad_hom = entidad %>% reemplazo_acentos)
+```
+
+# Descarga de bases de datos
+```{r}
+# ---- Confrontas ----
+primera_confronta <- openxlsx::read.xlsx(here::here("Confrontas",
+                                          "input",
+                                          "confrontas_anteriores",
+                                          "tabla_informacion_contacto_2.xlsx"))
+
+primera_confronta_con_dummies <- openxlsx::read.xlsx(here::here("Confrontas",
+                                          "input",
+                                          "confrontas_anteriores",
+                                          "primera_confronta.xlsx"))
+
+segunda_confronta <- openxlsx::read.xlsx(here::here("Confrontas",
+                                          "input",
+                                          "confrontas_anteriores",
+                                          "segunda_confronta_depurada.xlsx"))
+
+tercera_confronta <- openxlsx::read.xlsx(here::here("Confrontas",
+                                          "input",
+                                          "confrontas_anteriores",
+                                          "base_contactos_confrontas_segunda_version_14102025.xlsx"))
+
+cuarta_confronta <- openxlsx::read.xlsx(
+  here::here("Confrontas", 
+             "output", "cuarta_confronta_voto_INE_2024",
+             "cuarta_confronta_28112025.xlsx"),
+  sheet = 1 
+)
+
+# ---- Descargar base del RNPDNO actualizada ----
+comprimido <- procesamiento_base_final("2026-02-22")
+
+nrow(comprimido) 
+# 385,601 registros al 02 de dic. 2025
+# 386,081 registros al 08 de dic. 2025
+# 386,424 registros al 10 de dic. 2025
+# 386,793 registros al 14 de dic. 2025
+# 390,361 registros al 13 de feb. 2026
+# 390,361 registros al 23 de feb. 2026
+
+# Filtramos a las personas desaparecidas activas
+desaparecidos_activos <- comprimido |> 
+  filter(clasificacion_des %in% c("Desaparecidos", "Pendientes"))
+
+desaparecidos_activos <- desaparecidos_activos |> 
+  distinct(fub, .keep_all = T)
+
+# ---- Información de defunciones -----
+
+# Defunciones de la Secretaria de Salud
+defunciones_SSA <- openxlsx::read.xlsx(here::here("Confrontas",
+                                                "input",
+                                                "datos_sobre_defunciones",
+                                                "encontrados_base_unica.xlsx"))
+
+# Defunciones del INE
+defunciones_ine <- openxlsx::read.xlsx(here::here("Confrontas",
+                              "input",
+                              "datos_sobre_defunciones",
+                              "tabla_baja_INE.xlsx"))
+
+# Defunciones de la Pre-confronta
+defunciones_preconfronta <- read.csv(here::here("Confrontas",
+                                     "input",
+                                     "datos_sobre_defunciones",
+                                     "cruce_todo_202505271127_InstitucionesConfronta.csv"))
+
+# ----- Información de listas negras ------
+# (contienen información de personas a las que se le llamaron y no contestaron)
+
+# Pesataña 1
+lista_negra1 <- openxlsx::read.xlsx(here::here("Confrontas",
+                                               "input",
+                                               "listas_negras",
+                                               "LISTA NEGRA PARA NO LLAMARLES.xlsx")
+  , sheet = 1) |> 
+  clean_names()
+
+# Pestaña 2
+lista_negra2 <- openxlsx::read.xlsx(here::here("Confrontas",
+                                               "input",
+                                               "listas_negras",
+                                               "LISTA NEGRA PARA NO LLAMARLES.xlsx")
+  , sheet = 2, startRow = 2) |> 
+  clean_names()
+
+# Ordenamos la pestaña 2
+names(lista_negra2) <- lista_negra2[1, ] |>  as.character()
+lista_negra2 <- lista_negra2[-1, ] 
+
+# Pestaña 3
+lista_negra3 <- openxlsx::read.xlsx(here::here("Confrontas",
+                                               "input",
+                                               "listas_negras",
+                                               "LISTA NEGRA PARA NO LLAMARLES.xlsx")
+  , sheet = 3) |> 
+  clean_names()
+
+# Tabla con fub y nombre completo de personas en las listas negras
+lista_negra1 <- lista_negra1 |> 
+  select(fub, nombre_desparecida = nombre_completo_de_la_persona_desaparecida)
+
+lista_negra1$origen <- "pestaña1"
+
+lista_negra2 <- lista_negra2 |> 
+  select(fub, nombre_desparecida = nombre_completo_de_la_persona_desaparecida)
+lista_negra2$origen <- "pestaña2"
+
+lista_negra3 <- lista_negra3 |> 
+  select(fub, nombre_desparecida = nombre_del_familiar_desaparecido)
+lista_negra3$origen <- "pestaña3"
+
+# Lista negra completa
+lista_negra_completa <- lista_negra1 |>  
+  bind_rows(lista_negra2) |> 
+  bind_rows(lista_negra3)
+
+# Borramos bases innecesarias
+rm(lista_negra1, lista_negra2,lista_negra3)
+
+## ---- Listas negras de SEGOB ----- lista_segob
+
+lista_segob <- openxlsx::read.xlsx(here::here("Confrontas",
+                                               "input",
+                                               "listas_negras",
+                                               "lista_segob.xlsx"))
+
+lista_segob_reducida <- lista_segob |> 
+  select(nombre_desaparecida = nombre_desaparecido)
+```
+
+# Tratamiento de cada confronta 
+
+## Tratamiento de la primera confronta
+```{r}
+# Eliminar duplicados de curp
+primera_confronta <- primera_confronta |> 
+  distinct(curp_completo, .keep_all = T) 
+
+# Eliminar duplicados de fub
+primera_confronta <- primera_confronta |> 
+  distinct(fub, .keep_all = T) 
+
+# Columna de nombre completo
+primera_confronta <- primera_confronta |> 
+  mutate(nombre_completo_vic = paste0(
+    nombre_vic, " ", primerapellido_vic, " ", segundoapellido_vic)) 
+
+# Creamos indicadora de la primera confronta
+primera_confronta$indicadora_confronta1 <- "confronta1"
+
+# Seleccionamos columnas importantes con un indicador de que se trata de la confronta n
+primera_confronta <- primera_confronta |> 
+  select(
+    fub, 
+    curp_completo_confronta1 = curp_completo, 
+    nombre_completo_vic_confronta1 = nombre_completo_vic, 
+    numeros_de_contacto_confronta1 = numeros_de_contacto, 
+    indicadora_confronta1,
+    nombre_vic1 = nombre_vic,
+    primerapellido_vic1 = primerapellido_vic,
+    segundoapellido_vic1 = segundoapellido_vic,
+    sexo1 = sexo,
+    fechanacimiento1 = fechanacimiento,
+    idestadonacimiento_vic1 = idestadonacimiento_vic
+    )
+
+# Añadir institución de donde proviene información
+primera_confronta <- primera_confronta |> 
+  left_join(primera_confronta_con_dummies |> 
+              select(-fub), by = c("curp_completo_confronta1" = "curp_completo"))
+
+# Hacemos un join con el RNPDNO para enriquecer la base de desaparecidos activos con información de contacto e indicios de vida recientes de la primera confronta. La variable `indicadora_confronta1` permite rastrear el origen de los datos, aunque se sacrifica detalle institucional específico por eficiencia operativa.
+
+desaparecidos_activos <- desaparecidos_activos |> 
+  left_join(primera_confronta |> 
+              select(-c(nombre_vic,
+                       primerapellido_vic,
+                       segundoapellido_vic,
+                       fechanacimiento,
+                       sexo,
+                       idestadonacimiento_vic)), by = "fub") 
+
+# Quitamos fubs repetidos
+desaparecidos_activos <- desaparecidos_activos |> 
+  distinct(fub, .keep_all = TRUE)
+```
+
+
+## Tratamiento de la segunda confronta 
+```{r}
+# Esta confronta no tiene todavía la indicadora válida de vida ni la columna única de teléfono.
+
+# Crear indicadora de curp válida
+segunda_confronta <- segunda_confronta |> 
+  mutate(indicadora_curp_valid = ifelse(
+    es_curp_valida(curp_vic), "valida", "invalida"
+  ))
+
+# Se separa la base en la de curps validas y la de invalidas. Para la de válidas se hace el distinct por curp. A las inválidas no se les hace nada
+segunda_confronta_curp_valida <- segunda_confronta %>%
+  filter(indicadora_curp_valid == "valida")
+
+segunda_confronta_curp_invalida <- segunda_confronta %>%
+  filter(indicadora_curp_valid == "invalida")
+
+segunda_confronta_curp_valida <- segunda_confronta_curp_valida |> 
+  distinct(curp_vic, .keep_all = T) # Eliminar curps válidas duplicadas
+
+# Volver a unir las bases
+segunda_confronta <- bind_rows(segunda_confronta_curp_valida,
+                               segunda_confronta_curp_invalida)
+
+# Columna de nombre completo
+segunda_confronta <- segunda_confronta |> 
+  mutate(nombre_completo_vic = paste0(
+    nombre_vic, " ", primerapellido_vic, " ", segundoapellido_vic)) 
+
+# Indicadora de la segunda confronta
+segunda_confronta$indicadora_confronta2 <- "confronta2"
+
+# Crear dummies indicadores por dependencia de origen
+#segunda_confronta %>% select(starts_with("confronta")) %>% View()
+segunda_confronta$confronta_issste_fecha <- 
+  as.Date(segunda_confronta$confronta_issste_fecha)
+
+# Creamos indicadores  
+segunda_confronta <- 
+  segunda_confronta |> 
+  mutate(
+    ind_sat = if_else(
+      anio_completado_sat_ult_mov >= fecha_hechos_modificada, 1, 0),
+    ind_issste = if_else(confronta_issste_fecha >= fecha_hechos_modificada, 1, 0),
+    ind_inami =  if_else(confronta_inami_fecha_repatriacion_limpia >= fecha_hechos_modificada |
+                           confronta_inami_fecha_registro >= fecha_hechos_modificada, 1, 0),
+    ind_sict = if_else(fecha_evento_sict >= fecha_hechos_modificada, 1, 0),
+    ind_imss = if_else(fecha_evento_imss >= fecha_hechos_modificada, 1, 0),
+    ind_bienestar = if_else(fecha_evento_bienestar >= fecha_hechos_modificada, 1, 0),
+    ind_sre = if_else(confronta_sre_fecha_entrega >= fecha_hechos_modificada, 1, 0)
+  )
+
+# Preparamos join con el RNPDNO
+segunda_confronta <-
+  segunda_confronta |> 
+  select(
+    fub, 
+    curp_completo_confronta2 = curp_vic, 
+    nombre_completo_vic_confronta2 = nombre_completo_vic, 
+    numeros_de_contacto_confronta2 = numeros_contacto_confronta2, 
+    indicadora_confronta2, ind_bienestar, ind_imss, ind_issste, ind_sat, 
+    ind_sict, ind_sre, ind_inami)
+
+# Eliminar los registros que no tengan ningun indicio de vida == 1
+segunda_confronta <- segunda_confronta |> 
+  filter(if_any(starts_with("ind_"), ~ .x == 1))
+
+# Hacer join con el corte del RNPDNO
+desaparecidos_activos <-
+  desaparecidos_activos |> 
+  left_join(segunda_confronta, by = "fub") 
+
+# Quitamos fubs repetidos
+desaparecidos_activos <-
+  desaparecidos_activos |> 
+  distinct(fub, .keep_all = TRUE)
+```
+
+
+## Tratamiento de la tercera confronta (INE)
+
+Es importante considerar que la pérdida de vigencia $\textbf{no}$ se considera un trámite válido para considerarse indicio de vida.
+
+```{r}
+# Indicadora del INE de tercera confronta
+tercera_confronta <- tercera_confronta |> 
+  mutate(ind_ine_3ra_confronta = case_when(
+    str_starts(localizado, "LOCALIZADO") &
+    fecha_hechos_modificada < fecha_tramite ~ 1,
+    TRUE ~ 0
+  ),
+  ind_banco_3ra_confronta = case_when(
+    !is.na(institucion) &
+      fecha_hechos_modificada < fecha_ultima_verificacion ~ 1,
+    TRUE ~ 0
+  ))
+
+# Debemos de filtrar por pérdida de vigencia
+tercera_confronta <- tercera_confronta |> 
+  filter(!tipo_baja %in% "PERDIDA DE VIGENCIA")
+
+# Indicador
+tercera_confronta$indicadora_confronta3 <- "confronta3"
+
+# La tercera confronta no contenía números de contacto
+tercera_confronta <- tercera_confronta |> 
+  select(
+    fub, 
+    # curp_completo_confronta3 = curp_vic, 
+    # nombre_completo_vic_confronta3 = nombre_completo_vic, 
+    indicadora_confronta3, ind_ine_3ra_confronta, ind_banco_3ra_confronta)
+
+# Solo quedanos con indicios en cualquiera de los dos campos
+tercera_confronta <- tercera_confronta |> 
+  filter(
+    (!is.na(ind_ine_3ra_confronta) & ind_ine_3ra_confronta != 0) | 
+    (!is.na(ind_banco_3ra_confronta) & ind_banco_3ra_confronta != 0)
+  )
+# Hacer join con el corte del RNPDNO
+desaparecidos_activos <- desaparecidos_activos |> 
+  left_join(tercera_confronta, by = "fub") 
+
+# Quitamos fubs repetidos
+desaparecidos_activos <- desaparecidos_activos |> 
+  distinct(fub, .keep_all = TRUE)
+```
+
+
+## Tratamiento de la cuarta confronta
+```{r}
+# Crear indicadora de curp válida
+cuarta_confronta <- cuarta_confronta |> 
+  mutate(indicadora_curp_valid = ifelse(
+    es_curp_valida(curp_vic), "valida", "invalida"
+  ))
+
+# Se separa la base en la de curps validas y la de invalidas. Para la de válidas se hace el distinct por curp. A las inválidas no se les hace nada
+cuarta_confronta_curp_valida <- cuarta_confronta %>%
+  filter(indicadora_curp_valid == "valida")
+
+cuarta_confronta_curp_invalida <- cuarta_confronta %>%
+  filter(indicadora_curp_valid == "invalida")
+
+# Eliminar curps válidas duplicadas
+cuarta_confronta_curp_valida <-
+  cuarta_confronta_curp_valida |> 
+  distinct(curp_vic, .keep_all = T) 
+
+# Volver a unir las bases
+cuarta_confronta <- bind_rows(cuarta_confronta_curp_valida,
+                              cuarta_confronta_curp_invalida)
+
+# Columna de nombre completo
+cuarta_confronta <- cuarta_confronta |> 
+  mutate(nombre_completo_vic = paste0(
+    nombre_vic, " ", primerapellido_vic, " ", segundoapellido_vic)) 
+
+# Indicadora de la cuarta confronta
+cuarta_confronta$indicadora_confronta4 <- "confronta4"
+
+# Preparamos join con el RNPDNO
+cuarta_confronta <- cuarta_confronta |> 
+  select(
+    fub, 
+    curp_completo_confronta4 = curp_vic, 
+    nombre_completo_vic_confronta4 = nombre_completo_vic, 
+    indicadora_confronta4, ind_tramite_ine, ind_voto2024, ind_baja_ine_suspension_perdida_nacionalidad)
+
+# Hacer join con el corte del RNPDNO
+desaparecidos_activos <- desaparecidos_activos |> 
+  left_join(cuarta_confronta, by = "fub") 
+
+# Quitamos fubs repetidos
+desaparecidos_activos <- desaparecidos_activos |> 
+  distinct(fub, .keep_all = TRUE)
+```
+
+# Creamos tabla final con indicios de vida 
+
+Una vez que tenemos los cruces con las cuatro confrontas (las cuales podemos distinguirlas por la variable indicadora), solo filtramos las columnas más importantes.
+
+```{r}
+# Seleccionamos columnas de interés
+desaparecidos_activos_reducido <- desaparecidos_activos %>%
+  mutate(nombre_completo = paste0(
+    nombre_vic, " ", primerapellido_vic, " ", segundoapellido_vic
+  )) %>%
+  select(
+    fub, 
+    nombre_completo,
+    nombre_completo_vic_confronta1, 
+    nombre_completo_vic_confronta2, 
+    nombre_completo_vic_confronta4,
+    indicadora_confronta3,
+    indicadora_confronta4,
+    ind_voto2024,
+    ind_tramite_ine,
+    ind_baja_ine_suspension_perdida_nacionalidad,
+    # nombre_completo_vic_confronta3, 
+    indicadora_confronta1, ind_renapo, ind_sat_1 = ind_sat.x, 
+    ind_rnip, ind_vivesalud, ind_sre_1 = ind_sre.x, ind_becas,
+    ind_bienestar_2 = ind_bienestar.y, ind_issste, ind_sict,
+    ind_inami, ind_consar, ind_rnd, ind_bienestar_1 = ind_bienestar.x,
+    ind_repuve, ind_vacunas, ind_imss_1 = ind_imss.x, indicadora_confronta2,
+    ind_imss_2 = ind_imss.y, ind_sat_2 = ind_sat.y, ind_sre_2 = ind_sre.y,
+    ind_banco_3ra_confronta, ind_ine_3ra_confronta) 
+
+# Limpiar
+desaparecidos_activos_reducido <- desaparecidos_activos_reducido |> 
+  mutate(across(where(is.numeric), ~ replace_na(.x, 0)))
+```
+
+# Limpieza de defunciones 
+
+El objetivo de matchear las observaciones del RNDPNO con la información de defunciones de otras instituciones es saber cuáles personas desparecidas o no localizadas están registradas como fallecidas en otras instituciones.
+
+Es importante considerar que las únicas columnas de defunción que cuentan con acta o certificado de defunción vienen de:
+
+1. Preconfronta (Renapo): defuncion_pre_confronta. Genera acta de defunción. El documento legal original que se registra en RENAPO
+
+2. (SSA): defunciones_SSA La copia certificada que se entrega a los familiares para trámites
+
+$\textbf{Las bases de defunciones son:}$
+
+1. defunciones_SSA (encontrados_defunciones == defunciones_SSA),
+
+2. defunciones_ine y
+
+3. defunciones_preconfronta.
+
+```{r}
+# Observaciones del RNPDNO de personas desaparecidas
+# Filtra el conjunto de datos 'comprimido' para incluir solo los registros
+# cuya clasificación de desaparecido (clasificacion_des) es "Pendientes" o "Desaparecidos".
+# El resultado son las personas activas en el registro que se confrontarán con las bases de defunciones.
+
+desaparecidos_activos_defunciones <- comprimido |> 
+  filter(clasificacion_des %in% c("Pendientes", "Desaparecidos"))
+
+# --------------------------------------------------------- #
+# Manejo de bases de defunciones -----
+# --------------------------------------------------------- #
+
+## ---- Matcheo con defunciones del ine ----
+
+# Crea una columna indicadora en la base del INE para marcar que es un registro de defunción de esa fuente.
+defunciones_ine$defuncion_ine <- "defuncion"
+
+# Une (left_join) los registros de personas desaparecidas activas con las defunciones del INE
+# utilizando el fub como identificador.
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  left_join(
+    defunciones_ine %>% select(fub, tipo_baja, defuncion_ine),
+    by = "fub"
+    )
+
+## ---- Matcheo con actas de defunción de la preconfronta ----
+
+# Pre-confronta
+# Limpia la base de datos 'defunciones_preconfronta'.
+defunciones_preconfronta <- defunciones_preconfronta |>
+  # Selecciona únicamente la CURP de la víctima y la fecha del acta de defunción de RENAPO.
+  select(curp_vic, fecha_renapo_actasdef) |> 
+# Filtra para incluir solo registros donde la fecha del acta de defunción NO es nula ni una cadena vacía.
+  filter(!is.na(fecha_renapo_actasdef) & fecha_renapo_actasdef!="")
+
+# Añadir indicadora de defunción de RENAPO
+defunciones_preconfronta$defuncion_pre_confronta <- "defuncion"
+
+# Une (left_join) los registros de personas desaparecidas activas con las defunciones de la preconfronta (RENAPO)
+# utilizando la 'curp_vic' como identificador.
+
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  left_join(
+    defunciones_preconfronta,
+    by = "curp_vic"
+    )
+
+## ----- Matcheo con defunciones de la Secretaria de Salud ----
+
+# Separar entre personas con curp y sin curp
+# Divide la base de defunciones de la SSA en dos subconjuntos para su posterior manejo:
+
+# 1. Registros con CURP.
+encontrados_defunciones_con_curp <- defunciones_SSA |>
+  filter(!is.na(curp))
+
+# 2. Registros sin CURP (se usarán para matcheo por nombre/fecha de nacimiento).
+encontrados_defunciones_sin_curp <- defunciones_SSA |>
+  filter(is.na(curp))
+
+# Eliminar duplicados de curp
+# Asegura que haya solo un registro por CURP en el subconjunto con CURP.
+encontrados_defunciones_con_curp <-
+  encontrados_defunciones_con_curp |>
+  distinct(curp, .keep_all = T)
+
+# Crea una columna indicadora para el match por CURP en la base de SSA.
+encontrados_defunciones_con_curp$defuncion_ssa <- "defuncion"
+
+### Hacer el match con curp
+# Unir los registros de desaparecidos activos con las defunciones de SSA (usando CURP).
+
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  left_join(
+    encontrados_defunciones_con_curp %>% select(curp, defuncion_ssa),
+    by = c("curp_vic" = "curp"))
+
+### Hacer el match con nombre y fecha de nacimiento con defunciones de la SSA.
+
+# Crear una columna indicadora para el match por nombre y fecha de nacimiento en la base de SSA.
+defunciones_SSA$defuncion_nombre <- "encontrados_defuncion_nombre"
+
+# Seleccionar las columnas necesarias para el matcheo por nombre y fecha de nacimiento.
+defunciones_SSA <-
+  defunciones_SSA |>
+  select(nom_c, nac_f, defuncion_nombre)
+
+# Generamos variable de nombre completo
+# Crea la variable 'nombre_completo_vic' en la base de desaparecidos para el matcheo.
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  mutate(nombre_completo_vic = paste0(
+    nombre_vic, " ", primerapellido_vic, " ", segundoapellido_vic))
+
+# Unir por nombre completo. Esto es un matcheo preliminar.
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  left_join(defunciones_SSA, by = c("nombre_completo_vic" = "nom_c"))
+
+# Refinar el matcheo por nombre: solo se considera un match exitoso si el nombre completo coincide
+# Y la fecha de nacimiento del desaparecido ('fechanacimiento') coincide con la fecha de nacimiento registrada en el registro de defunción de SSA ('nac_f').
+# Si no coinciden las fechas, se asigna NA a 'defuncion_nombre'.
+
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  mutate(defuncion_nombre = if_else(
+    fechanacimiento == nac_f, "encontrados_defuncion_nombre", NA
+    ))
+
+#------------------------------------------------------------------------------#
+# Creamos indicador de defunciones de alguna institución ----
+#------------------------------------------------------------------------------#
+
+# Crea el indicador consolidado 'indicadora_defuncion'.
+# Una persona se marca como "defuncion" si tiene un match exitoso en *al menos una* de las fuentes:
+# INE, Preconfronta (RENAPO), SSA por CURP o SSA por Nombre/Fecha de Nacimiento.
+
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  mutate(indicadora_defuncion = ifelse(
+    !is.na(defuncion_ine) | !is.na(defuncion_pre_confronta) |
+      !is.na(defuncion_ssa) | !is.na(defuncion_nombre), "defuncion", "no defuncion"
+    ))
+
+# ---- Tabla final defunciones ----
+
+# Calcula la frecuencia de la indicadora de defunción ("defuncion" vs "no defuncion").
+tabla_final_defunciones <-
+  desaparecidos_activos_defunciones |>
+  count(indicadora_defuncion)
+
+# ----- Curp válida o no válida -----
+
+# Evalúa si la CURP de la víctima es válida utilizando la función 'es_curp_valida'
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  mutate(indicadora_curp_valida = ifelse(
+    es_curp_valida(curp_vic), "valida", "invalida"
+    ))
+
+#----- Separamos base final entre observaciones con curp inválida -----
+
+# Filtra las personas con CURP inválida.
+desaparecidos_activos_defunciones_curp_invalida <- desaparecidos_activos_defunciones |>
+  filter(indicadora_curp_valida == "invalida")
+
+#----- Separamos base final entre observaciones con curp válida ------
+
+# Filtra las personas con CURP válida.
+desaparecidos_activos_defunciones_curp_valida <- desaparecidos_activos_defunciones |> 
+  filter(indicadora_curp_valida == "valida")
+
+# Eliminamos duplicados con el subconjunto de curps válidas
+# Para el subconjunto de CURPs válidas, elimina registros duplicados usando 'curp_vic' como clave.
+# Esto asegura que cada CURP válida aparezca una sola vez.
+desaparecidos_activos_defunciones_curp_valida <-
+  desaparecidos_activos_defunciones_curp_valida |>
+  distinct(curp_vic, .keep_all = T)
+
+#----- Juntamos ambas bases de datos: con y sin curp válida ------
+
+# Combinar los dos subconjuntos (CURP válida sin duplicados y CURP inválida) para restaurar la base completa.
+desaparecidos_activos_defunciones <- bind_rows(desaparecidos_activos_defunciones_curp_valida, desaparecidos_activos_defunciones_curp_invalida)
+
+# Eliminamos duplicados en fubs
+
+# Elimina cualquier duplicado restante usando el 'fub' (el identificador original del caso) como clave.
+# Esto asegura que cada caso de desaparecido aparezca una sola vez en la base final.
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |>
+  distinct(fub, .keep_all = T)
+
+# Muestra el resumen de la tabla de la indicadora de defunción después de la deduplicación final.
+
+no_defunciones <- desaparecidos_activos_defunciones |> filter(indicadora_defuncion == "defuncion") |> nrow()
+
+no_de_no_defunciones <- desaparecidos_activos_defunciones |> filter(indicadora_defuncion == "no defuncion") |> nrow()
+
+fecha_actual <- format(today() , "%d de %B de %Y")
+
+cat("A la fecha DEL", fecha_actual, "hay", comma(no_defunciones), "defunciones y",
+comma(no_de_no_defunciones), "no defunciones.")
+
+#----- Obtenemos solo aquellos fubs con status de defunción -----
+
+# Filtra la base final para incluir únicamente las personas que fueron encontradas como registradas
+# como fallecidas en al menos una de las fuentes institucionales.
+
+desaparecidos_activos_defunciones <- desaparecidos_activos_defunciones |>
+  filter(indicadora_defuncion == "defuncion")
+
+```
+
+
+# Quitar listas negras de fubs de las bases de confrontas
+
+Estos registros contienen los números que han contestado y aquellos que no lo han hecho.
+
+```{r}
+#------------------------------------------------------------------------------#
+# Tabla única para depurar ------
+# lista_segob + lista_negra_completa
+#------------------------------------------------------------------------------#
+
+tabla_excluidos_completa <- lista_negra_completa %>%
+  bind_rows(lista_segob_reducida)
+
+# Sacamos el números de fubs únicos de tabla_excluidos_completa
+no_de_fubs_a_excluir <- tabla_excluidos_completa |> distinct(fub) |> nrow()
+
+cat("El número de fubs a excluir que están en listas negras son", 
+comma(no_de_fubs_a_excluir))
+
+# Creamos columna de indicio según si la persona aparece en otras confrontas
+desaparecidos_activos <-
+  desaparecidos_activos |> 
+  mutate(indicadora_indicios = if_else(
+    indicadora_confronta1 == "confronta1" | 
+      indicadora_confronta2 == "confronta2" | 
+      indicadora_confronta3 == "confronta3" |
+      indicadora_confronta4 == "confronta4", "con indicio", "sin indicio"
+  ))
+
+# Filtramos por curp válida
+desaparecidos_activos_curp_valida <- desaparecidos_activos |> 
+  filter(indicadora_curp_valida == "valida")
+
+# Filtramos por curp inválida
+desaparecidos_activos_curp_invalida <- desaparecidos_activos |> 
+  filter(indicadora_curp_valida == "invalida")
+
+# Filtramos curps repetidas
+desaparecidos_activos_curp_valida <-
+  desaparecidos_activos_curp_valida |> 
+  distinct(curp_vic, .keep_all = T)
+
+# Volvemos a juntar
+desaparecidos_activos <- bind_rows(desaparecidos_activos_curp_invalida, desaparecidos_activos_curp_valida)
+
+# Eliminar duplicados de fub
+desaparecidos_activos <-
+  desaparecidos_activos |> 
+  distinct(fub, .keep_all = T)
+
+#------------------------------------------------------------------------------#
+# Limpiar fubs de lista negra ----
+#------------------------------------------------------------------------------#
+
+# Localizar fubs de lista negra
+fubs_lista_negra <- tabla_excluidos_completa |> 
+  filter(!is.na(origen)) |> pull(fub)
+
+#------------------------------------------------------------------------------#
+# Aplicar filtros y exclusiones a la tabla de confrontas ----
+#------------------------------------------------------------------------------#
+
+## Eliminar los fubs de lista negra
+
+# Primero creamos una columna con el número de fila
+tabla_excluidos_completa$id <- 1:nrow(tabla_excluidos_completa)
+
+## Quitar listas negras ------
+desaparecidos_activos <- 
+desaparecidos_activos |> 
+  filter(!fub %in% fubs_lista_negra)
+
+desaparecidos_activos_defunciones <- 
+  desaparecidos_activos_defunciones |> 
+  filter(!fub %in% fubs_lista_negra)
+
+## Quitar lista segob -----
+lista_segob_fubs <- lista_segob$fub
+
+desaparecidos_activos <-
+  desaparecidos_activos |> 
+  filter(!fub %in% lista_segob_fubs)
+
+desaparecidos_activos_defunciones <-
+  desaparecidos_activos_defunciones |> 
+  filter(!fub %in% lista_segob_fubs)
+```
+
+
+# Resultados finales de coincidencias administrativas
+
+Vale la pena recordar lo siguiente:
+$$
+\text{Coincidencias administrativas} = \text{Indicios de vida} + \text{Defunciones.}
+$$
+
+Es importante notar que se debe especificar la fecha MÍNIMA (`fecha_min_registros_admin`) en la que se quiere realizar el corte. A febrero de 2026, la especificación es a partir de 2006, tal como se ha definido en la PPT de Personas Desaparecidas.
+
+
+```{r}
+## Definir fecha mínima
+fecha_min_registros_admin <- as.Date("2006-01-01")
+
+## Obtener total de fubs con defunción -----
+fubs_defuncion <- desaparecidos_activos_defunciones |> 
+  filter(fecha_hechos_modificada >= fecha_min_registros_admin) |> 
+  filter(indicadora_defuncion == "defuncion") |>
+  pull(fub)
+
+### Adicionalmente, obtener archivo completo
+fubs_defuncion_df <- desaparecidos_activos_defunciones |> 
+  filter(fecha_hechos_modificada >= fecha_min_registros_admin) |> 
+  filter(indicadora_defuncion == "defuncion")
+
+## Obtener total de fubs con inndicios de vida -----
+fubs_indicios <- desaparecidos_activos |> 
+  filter(fecha_hechos_modificada >= fecha_min_registros_admin) |> 
+  filter(indicadora_indicios == "con indicio") |> 
+  pull(fub)
+
+## Total de fubs con registros administrativos (defunciones + indicios de vida)
+total_fubs_indicios <- c(fubs_defuncion, fubs_indicios) |> unique()
+
+# --------------------------------------------------------- #
+# Totales -----
+# --------------------------------------------------------- #
+
+fubs_con_registro_admin <- comma(total_fubs_indicios |> length())
+fubs_con_defuncion <- comma(fubs_defuncion |> length())
+
+
+cat("El total de fubs con registro administrativo son:", fubs_con_registro_admin, "\n")
+cat("El total de fubs con marca de defunción son:", fubs_con_defuncion, "\n")
+
+fubs_indicios_sin_defunciones <- setdiff(total_fubs_indicios, fubs_defuncion)
+no_fubs_indicios_sin_defunciones <- comma(fubs_indicios_sin_defunciones |> length())
+
+cat("El total de fubs con indicios de vida (sin defunciones) son:", no_fubs_indicios_sin_defunciones)
+
+```
+
+
+## Conteos de defunciones por institución
+
+Una misma `fub` puede tener marca de defunción con varias instituciones. Sin embargo, solo contaremos una vez por institución, siguiendo el siguiente orden:
+
+1. RENAPO
+2. SSA
+3. INE
+
+El criterio responde a dos vías: primero, el orden en que llegaron los datos (siendo el INE la última institución en mandar las listas de defunciones) y segundo, RENAPO es la institución con más credibilidad para asentar un registro de defunción.
+
+```{r}
+## ----- Tabla de desaparecidos con registro de defunción ------
+tabla_con_defuncion_desaparecidos <- desaparecidos_activos_defunciones |> 
+  filter(fub %in% fubs_defuncion)
+
+nrow(tabla_con_defuncion_desaparecidos) 
+
+# Solo contamos una vez a la SSA
+tabla_con_defuncion_desaparecidos <- 
+  tabla_con_defuncion_desaparecidos |> 
+  mutate(defuncion_ssa = if_else(
+    !is.na(defuncion_nombre) | !is.na(defuncion_ssa), "defuncion", NA
+  ))
+
+# Primero por RENAPO y así sucesivamente
+renapo_defunciones <- comma(tabla_con_defuncion_desaparecidos |> 
+  filter(defuncion_pre_confronta == "defuncion") |> nrow())
+
+des_filt <- tabla_con_defuncion_desaparecidos  |> 
+  filter(defuncion_pre_confronta != "defuncion" | is.na(defuncion_pre_confronta))
+
+ssa_defunciones <- comma(
+  des_filt |> 
+  filter(defuncion_ssa == "defuncion") |> nrow()
+)
+
+des_filt_remanente <- des_filt |> 
+  filter(defuncion_ssa != "defuncion" | is.na(defuncion_ssa))
+
+ine_defunciones <- comma(
+  des_filt_remanente |> 
+  filter(defuncion_ine == "defuncion") |> nrow()
+)
+```
+
+## Tabla de conteos de indicios de vida por institución
+
+```{r}
+## ----- Tabla de desaparecidos con registro de indicios de vida ------
+
+# Tabla
+tabla_con_ind_vida <- desaparecidos_activos |> 
+  filter(fecha_hechos_modificada >= fecha_min_registros_admin) |> 
+  filter(indicadora_indicios == "con indicio" &
+           !fub %in% fubs_defuncion)
+
+# Vemos si hay repetidos
+tabla_con_ind_vida |> group_by(fub) |> filter(n() > 1) |> nrow()
+
+# Limpiamos
+tabla_con_ind_vida <- tabla_con_ind_vida |> 
+   mutate(across(where(is.numeric), ~ replace_na(.x , 0)))
+
+# Las instituciones que vienen de más de una confronta debemos colapsarlas en una variable única
+tabla_con_ind_vida <- tabla_con_ind_vida |>
+  # Asegurarnos de que los NAs sean 0 para la comparación
+  mutate(across(starts_with("ind_"), ~ replace_na(.x, 0))) |>
+  
+  # Crear las columnas consolidadas
+  mutate(
+    # SRE
+    ind_sre_total = pmax(ind_sre.x, ind_sre.y),
+    # SAT
+    ind_sat_total = pmax(ind_sat.x, ind_sat.y),
+    # Bienestar
+    ind_bienestar_total = pmax(ind_bienestar.x, ind_bienestar.y),
+    # IMSS
+    ind_imss_total = pmax(ind_imss.x, ind_imss.y)
+
+  )
+
+# Sumamos los indicadores de cada institución
+conteo_por_institucion <- tabla_con_ind_vida |>
+  select(
+    # Los que combinamos
+    ind_sre_total, ind_sat_total, ind_bienestar_total, ind_imss_total,
+    # Y los indicadores sencillos (sin .x/.y)
+    ind_renapo, ind_rnip, ind_vivesalud, ind_issste, ind_sict, ind_inami, ind_becas,
+    ind_ine_3ra_confronta, ind_consar, ind_rnd, ind_repuve, ind_vacunas,
+    ind_banco_3ra_confronta, ind_voto2024, ind_tramite_ine,
+    ind_baja_ine_suspension_perdida_nacionalidad
+  ) |>
+  # Sumamos cada columna para obtener el total de casos con indicio
+  summarise(across(everything(), ~ sum(.x))) |>
+  pivot_longer(everything(), names_to = "Institucion", values_to = "Total_Casos")
+```
+
+```{r}
+# --------------------------------------------------------- #
+# Conteo de indicios con instituciones que reportan los indicios -----
+# --------------------------------------------------------- #
+
+tabla_con_ind_vida <- tabla_con_ind_vida |> 
+  select(
+    nombre_vic,
+    primerapellido_vic,
+    segundoapellido_vic,
+    indicadora_indicios,
+    curp_vic,
+    fub,
+    nombre_completo_vic_confronta1, nombre_completo_vic_confronta2, 
+    # nombre_completo_vic_confronta3, 
+    indicadora_confronta1, ind_renapo, ind_sat_total, 
+    ind_rnip, ind_vivesalud, ind_sre_total, ind_becas,
+    ind_bienestar_total, ind_issste, ind_sict,
+    ind_inami, ind_consar, ind_rnd,
+    ind_repuve, ind_vacunas, ind_imss_total,
+    indicadora_confronta2,
+    indicadora_confronta3, ind_banco_3ra_confronta, ind_ine_3ra_confronta,
+    ind_baja_ine_suspension_perdida_nacionalidad,ind_voto2024,
+    indicadora_confronta4) 
+
+# Limpiar
+tabla_con_ind_vida <- tabla_con_ind_vida |> 
+  mutate(across(where(is.numeric), ~ replace_na(.x, 0)))
+
+# Creamos una columna con una lista sobre en donde se ha encontrado el indicio de vida de la persona
+
+# Primero definimos el mapeo de instituciones
+# Mapeo de instituciones actualizado
+mapeo_instituciones <- c(
+  # Confronta 1 
+  ind_renapo = "RENAPO",
+  ind_consar = "CONSAR",
+  ind_sat_total = "SAT",
+  ind_rnd = "RND",
+  ind_rnip = "RNIP",
+  ind_bienestar_total = "Secretaría de Bienestar", 
+  ind_vivesalud = "ViveSalud",
+  ind_repuve = "REPUVE",
+  ind_sre_total = "SRE", 
+  ind_vacunas = "Vacunas",
+  ind_becas = "Becas",
+  ind_imss_total = "IMSS",
+  
+  # Confronta 2 
+  ind_issste = "ISSSTE",
+  ind_sict = "SICT",
+  ind_inami = "INAMI",
+  
+  # Confronta 3 (INE y Bancos)
+  ind_ine_3ra_confronta = "Trámite/Registro INE (3ra Confronta)",
+  ind_banco_3ra_confronta = "Bancos",
+  
+  # Indicios de Flujo 3 (INE Voto y Bajas)
+  ind_tramite_ine = "Trámite en el INE (Válido)",
+  ind_voto2024 = "Voto en 2024 (Válido)",
+  ind_baja_ine_suspension_perdida_nacionalidad = "Baja en el INE (Suspensión/Pérdida Nacionalidad)"
+)
+
+# Sumamos instituciones en donde ha aparecido la persona desaparecida
+tabla_con_ind_vida <- tabla_con_ind_vida |> 
+  mutate(
+    temp_result = map(1:n(), function(i) {
+      # Para cada fila, encontrar las instituciones con 1
+      instituciones <- character()
+      
+      for (col in names(mapeo_instituciones)) {
+        if (col %in% names(tabla_con_ind_vida) && 
+            !is.na(tabla_con_ind_vida[[col]][i]) && 
+            tabla_con_ind_vida[[col]][i] == 1) {
+          instituciones <- c(instituciones, mapeo_instituciones[col])
+        }
+      }
+      
+      # Eliminar duplicados
+      instituciones <- unique(instituciones)
+      
+      # Retornar tanto la lista como el conteo
+      if (length(instituciones) == 0) {
+        list(instituciones = NA_character_, conteo = 0)
+      } else {
+        list(instituciones = paste(sort(instituciones), collapse = ", "), 
+             conteo = length(instituciones))
+      }
+    }),
+    
+    # Extraer los resultados
+    institucion_indicadora_de_vida = map_chr(temp_result, ~ .x$instituciones),
+    numero_instituciones = map_int(temp_result, ~ .x$conteo)
+  ) |> 
+  select(-temp_result)  # Eliminar columna temporal
+
+# Nos quedamos con solo las columnas importantes
+tabla_con_indicios_reducido <- tabla_con_ind_vida |> 
+  mutate(indicadora_indicio_de_vida = "con indicio") |> 
+  select(fub, curp_vic, 
+    indicadora_indicio_de_vida,
+    institucion_indicadora_de_vida,
+    numero_instituciones)
+    
+# Consolidar curps por si hay faltantes
+tabla_con_indicios_reducido <- tabla_con_indicios_reducido |> 
+  left_join(desaparecidos_activos |> 
+    rename(curp_rnpdno = curp_vic) |> 
+    select(fub, curp_rnpdno), by = "fub") |> 
+    select(-curp_vic) |> 
+    rename(curp_vic = curp_rnpdno)
+
+
+tabla_con_indicios_reducido <- tabla_con_indicios_reducido |> 
+  select(fub, curp_vic, everything())
+
+# Crear indicadora de registro
+tabla_con_indicios_reducido$indicadora_indicio_de_vida <- "con registro administrativo"
+
+# Añadir defunciones
+tabla_con_indicios_reducido <- tabla_con_indicios_reducido |> 
+  bindw_rows(
+    fubs_defuncion_df |> select(fub, curp_vic) |> 
+      mutate(indicadora_indicio_de_vida = "defuncion")
+    )
+
+# --------------------------------------------------------- #
+# GUARDAMOS 
+# --------------------------------------------------------- #
+
+writexl::write_xlsx(
+  tabla_con_indicios_reducido,
+  here::here("RNPDNO",
+             "output",
+             "resultados_final_confrontas",
+             "tabla_con_indicios_reducido_13022026.xlsx"))
+
+tabla_con_indicios_reducido_con_comprimido <- tabla_con_indicios_reducido |> 
+  select(-curp_vic) |> 
+  left_join(
+    comprimido,
+    by = "fub"
+  )
+
+writexl::write_xlsx(
+  tabla_con_indicios_reducido_con_comprimido,
+  here::here("RNPDNO",
+             "output",
+             "resultados_final_confrontas",
+             "tabla_con_indicios_reducido_con_comprimido_13022026.xlsx"))
+
+# tabla_con_ind_vida
+
+writexl::write_xlsx(
+  tabla_con_ind_vida,
+  here::here("RNPDNO",
+             "output",
+             "resultados_final_confrontas",
+             "tabla_con_ind_vida_desglosado_por_inst_13022026.xlsx"))
+
+# --------------------------------------------------------- #
+# Especial : crear corte de rnpdno al 16 de feb de 2026
+
+tabla_con_indicios_especial$corte_RNPDNO <- "2026-02-16"
+
+tabla_con_indicios_especial <- tabla_con_indicios_especial |> 
+  distinct(fub, .keep_all = T)
+
+tabla_con_indicios_especial %>%
+  writexl::write_xlsx("RNPDNO_confrontas/base_datos_contacto/tabla_con_indicios_resumen_con_institucion_16022026.xlsx")
+```

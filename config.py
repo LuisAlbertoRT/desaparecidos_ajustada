@@ -359,7 +359,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-23.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-24.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -559,9 +559,9 @@ PPT_DIARIO_FILE = ppt_diario_file()
 # ─────────────────────────────────────────────────────────────────────────────
 # DIRECTORIO DE INDICIOS DE VIDA · lámina 12 del reporte diario
 # ─────────────────────────────────────────────────────────────────────────────
-# Corte congelado de las personas con indicio de vida al 24/06/2026, con domicilio
-# y números de contacto. NO pasa por el pipeline: es una foto fija que se cruza
-# contra el RNPDNO vigente para ver cuántos de esos indicios YA SE FORMALIZARON
+# Directorio actualizado al 18/11/2026, con domicilio y números de contacto.
+# NO pasa por el pipeline: es una foto fija que se cruza contra el RNPDNO vigente
+# para ver cuántos de esos indicios YA SE FORMALIZARON
 # como localización (de ahí el token `fmz` = formalizados).
 #
 # Alimenta estos marcadores de la plantilla:
@@ -583,13 +583,15 @@ PPT_DIARIO_FILE = ppt_diario_file()
 DIRECTORIO_INDICIOS_DIR = INPUT_DIR / "domicilios_y_numeros_contacto"
 DIRECTORIO_INDICIOS_FILE = (
     DIRECTORIO_INDICIOS_DIR
-    / "base_combinada_con_domicilio_y_numeros_de_contacto_24062026.xlsx"
+    / "Directorio_nacional_18112026_insumo.xlsx"
 )
-DIRECTORIO_INDICIOS_SHEET = 0
+DIRECTORIO_INDICIOS_SHEET = "Personas desaparecidas"
+DIRECTORIO_INDICIOS_SKIPROWS = 1
 
-# Fecha del corte, en el formato que usan los marcadores. Si cambia el archivo,
-# cambia también aquí y los marcadores se renombran solos.
+# Se conserva el identificador de los placeholders existentes en la plantilla
+# para que el nuevo cálculo actualice sus gráficas sin modificarla.
 DIRECTORIO_INDICIOS_CORTE = "24jun26"
+DIRECTORIO_INDICIOS_FECHA_CORTE = "18/11/2026"
 
 # Sólo estas dos columnas se usan del archivo (trae 37).
 DIRECTORIO_INDICIOS_COLUMN_MAPPING = {

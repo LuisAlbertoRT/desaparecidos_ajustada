@@ -142,14 +142,14 @@ Además de los conteos directos, las plantillas usan seis familias calculadas ap
 | `pct_X_v1` / `_v2` / `_v3` | porcentajes de un reparto, con las décimas ajustadas para que el grupo sume exactamente 100% | `particiones.porcentajes_particion` |
 | `X-Y` | resta contra un corte congelado (25/03/2026 o 01/07/2026) | `utils.diferencias_vs_corte` |
 | `X_ddes` / `X_dloc` / `X_dfub` | altas y bajas cruzando los `fub` de ambas fotos; con `_v2`, contra el corte de julio | `utils.deltas_vs_corte` |
-| `reg_rn_24jun26-max_loc_fmz` y sus `_v2` / `_v3` / `_v4` | indicios de vida del directorio congelado que ya derivaron en una localización | `directorio_indicios.indicios_formalizados` |
+| `reg_rn_24jun26-max_loc_fmz` y sus `_v2` / `_v3` / `_v4` | indicios de vida del directorio actualizado que ya derivaron en una localización | `directorio_indicios.indicios_formalizados` |
 | `reg_mr_min-max*` | estatus vigente de las personas con detención penitenciaria | `utils.cruzar_mj_rips` |
 
 Las cuatro últimas necesitan un archivo que **no pasa por el pipeline**:
 
 - los cortes de marzo y julio, que llegan como Excel ya rebanado en `input/datos_marzo/` e
   `input/datos_julio/` (`config.CORTES_REFERENCIA`);
-- el directorio de indicios congelado al 24/06/2026 (`config.DIRECTORIO_INDICIOS_FILE`);
+- el directorio de indicios fechado al 18/11/2026 (`config.DIRECTORIO_INDICIOS_FILE`), que conserva los marcadores `24jun26` requeridos por la plantilla;
 - el archivo de MJ y RIPS (`config.MJ_RIPS_FILE`).
 
 Los dos últimos tampoco son rebanadas del universo —su población no sale del RNPDNO ni de

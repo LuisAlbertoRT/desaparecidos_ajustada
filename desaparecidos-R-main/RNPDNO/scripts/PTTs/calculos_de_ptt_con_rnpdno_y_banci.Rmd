@@ -1,0 +1,3800 @@
+---
+output:
+  pdf_document: 
+    number_sections: true # Le dice a Pandoc y LaTeX que enumere automáticamente los encabezados de Markdown (#, ##, ###).
+  word_document: default
+  html_document:
+    df_print: paged
+lang: es # Define el idioma
+header-includes: # Inclusión de paquetes de LaTeX para PDF
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+- \usepackage{enumitem} # Para que RStudio entienda el comando [label=\roman*)]
+- \usepackage[absolute,overlay]{textpos}
+- \usepackage{tocloft}             # Necesario para modificar el ToC
+- \AtBeginDocument{\renewcommand{\contentsname}{}} # anula la traducción de babel. Nos sirve para quitar el título que se crea al correr \tableofcontents
+---
+
+```{r setup, include=FALSE}
+# Configuración de los bloques de código
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, comment = "#")
+```
+
+---
+# Portada
+---
+
+\begin{center}
+\LARGE \textbf{Documentación del código para generar los insumos de gráficas y cálculos de la presentación de Personas Desaparecidas | RNPDNO y BANCI}
+\end{center}
+\vspace{3cm}
+
+\begin{center}
+\LARGE \text{Documentación del código}
+\\
+\vspace{0.5cm}
+\text{Autora: Jocelyn Rocha}
+\end{center}
+\vspace{4cm}
+
+\begin{center}
+\LARGE
+\textbf{Fecha de actualización:}\ Enero de 2026.
+\end{center}
+
+\newpage
+
+---
+# Índice 
+---
+
+\newpage
+\normalsize
+
+\addtocontents{toc}{\protect\thispagestyle{empty}}
+\begin{center}
+\textbf{\LARGE Índice}
+\end{center}
+
+\vspace{0.5cm}
+
+\tableofcontents
+
+---
+# Cuerpo del documento 
+---
+
+\newpage
+\pagenumbering{arabic}
+
+
+::: text-justify 
+
+# Descripción general del código
+
+**Script:** calculos_de_ptt_con_rnpdno_y_banci.R
+
+## Objetivos
+
+El general objetivo de este código es trabajar con datos del Repositorio Nacional de Personas Desaparecidas y No Localizadas (RNPDNO) y de la Base Nacional de Carpetas de Investigación de personas desaparecidas (BANCI) que entrega mensualmente el Secretariado Ejecutivo del Sistema Nacional de Seguridad Pública (SESNSP). Para tal fin, se consideran los siguientes objetivos específicos:
+
+1. Generar la base de datos de la intersección entre la BANCI y RNPDNO y la base de datos de aquellas personas que solo se encuentran en la BANCI pero no en RNPDNO.
+
+2. Trabajar una función que nos permita trabajar con una base consolidada de los datos de personas desaparecidas y localizadas de RNPDNO y BANCI con diferentes cortes de fechas. Para esto, vamos a sacar dos insumos. El primero son los datos sin match entre RNPDNO y BANCI, el segundo se refiere a la intersección entre ambos junto con los datos que solo están en RNPDNO, de tal manera que los datos en la intersección contendrán la información de desaparición que marca el RNPDNO y no el BANCI (así, por ejemplo, si la persona desaparecida $A$ está en BANCI como en RNPDNO pero tienen distinta fecha de desaparición, se prefiere la mencionada por RNPDNO sobre BANCI).
+
+3. Generar los insumos de las gráficas de a. personas desaparecidas con actividades y registros después de su fecha de desaparición, b. personas desaparecidas sin indicios con registros administrativos, c. personas desaparecidas sin datos y d. personas localizadas con cortes de fechas y subcategorías diversas.
+
+4. Calculas los datos que alimentan el árbol del RNPDNO, BANCI y confrontas que usualmente aparece al inicio de las PPTs sobre Personas Desaparecidas.
+
+5. Generar los datos del RNPDNO y la BANCI que alimentan el mismo árbol que se menciona en el punto anterior pero tomando a las entidades federativas individualmente.
+
+## Diferentes clasificaciones de _status_ en desaparición y localización
+
+La clasificación de las personas desaparecidas y localizadas que se utilizará en la generación de los insumos es la siguiente:
+
+\begin{enumerate}[label=\roman*)]
+  \item \textbf{Desaparecido con datos y sin registro administrativo:} 
+  Categoría definida por la fuente de origen:
+  \begin{itemize}
+      \item \textbf{RNPDNO:} Personas con CURP válida (pestaña \texttt{DESAPARECIDOS}) sin concordancia en registros administrativos.
+      \item \textbf{BANCI:} Personas sin coincidencia (\emph{match}) con RNPDNO. Aquí, ``con datos`` se refiere a la existencia de una carpeta de investigación en fiscalía, independientemente de la validez de la CURP.
+  \end{itemize}
+
+  \item \textbf{Sin datos (Solo RNPDNO):} 
+  Personas sin CURP válida o con información insuficiente (pestaña \texttt{'ACTUALIZACION\_PENDIENTE'}). Esta clasificación no es aplicable a los registros provenientes de la BANCI.
+
+  \item \textbf{Desaparecido con coincidencia con registro administrativo:} 
+  Personas con reporte de desaparición que presentan concordancia en cruces administrativos. Incluye registros de ambas pestañas del RNPDNO (\texttt{DESAPARECIDOS} y \texttt{ACTUALIZACION\_PENDIENTE}), sin distinguir la validez de la CURP.
+
+  \item \textbf{Localizados:} 
+  Subclasificación basada en el criterio de temporalidad para el análisis estadístico:
+  \begin{itemize}
+    \item \textbf{Por cohorte de desaparición:} El evento se registra en el periodo de la desaparición ($X$), aunque la localización ocurra en $Y$. Útil para medir la \textbf{tasa de resolución} de casos históricos.
+    \item \textbf{Por evento de localización:} El evento se registra en el periodo del hallazgo ($Y$), sin considerar la fecha de ausencia. Útil para cuantificar el \textbf{desempeño operativo} actual.
+  \end{itemize}
+  \textit{Nota: distinción permite elegir entre analizar la eficacia de cierre de casos o el volumen de actividad institucional del periodo vigente.}
+\end{enumerate}
+
+## Modificaciones de variables del RNPDNO
+
+Por otra parte, para los datos del RNPDNO, tenemos las siguientes modificaciones en las variables:
+
+\begin{enumerate}[label = \roman*)]
+  \item \textbf{Expediente o carpeta de investigación:} se reclasifican los registros según la validez legal del folio asignado. Un caso con \texttt{indicadora\_carpeta} igual a ``Con carpeta`` se clasifica como \textit{``carpeta de investigación``}. Por el contrario, si el valor es ``Sin carpeta`` (incluyendo expedientes no válidos o vacíos), se etiqueta como \textit{``expediente genérico``}.
+
+  \item \textbf{Dependencia de origen reclasificada:} se estandariza la institución informante mediante una búsqueda de patrones de texto (\textit{keywords}), aplicando la siguiente jerarquía lógica:
+  \begin{itemize}
+    \item \textbf{Fiscalías:} si el nombre contiene ``FISCALÍA``, ``PROCURADURÍA`` o términos afines, se subdivide cruzando la información con el ítem anterior en: ``Fiscalía con carpeta de investigación`` o ``Fiscalía con expediente genérico``.
+    \item \textbf{Comisiones de búsqueda:} se identifican y separan específicamente la ``Comisión Nacional de Búsqueda`` y las ``Comisiones Locales``. Otras variantes que inicien con ``COMISIÓN`` se agrupan como ``OTRA COMISIÓN``.
+    \item \textbf{Portales digitales:} los registros captados a través de plataformas web se agrupan bajo la categoría ``Portal``.
+    \item \textbf{Otros:} cualquier registro que no coincida con los patrones anteriores conserva su nombre original para evitar la pérdida de información residual.
+  \end{itemize}
+\end{enumerate}
+
+## Consideraciones para datos de la BANCI
+
+Adicionalmente, se deben considerar algunos puntos importantes respecto a la información generada en la BANCI:
+
+\begin{enumerate}[label = \roman*)]
+  \item Todos los datos en la BANCI cuentan con carpeta de investigación.
+  \item La dependencia de origen de todos los datos de la BANCI son de Fiscalías locales.
+\end{enumerate}
+
+
+# Limpieza e instalación de librerías
+```{r eval = FALSE}
+rm(list = ls())
+
+pacman::p_load(
+  readr, tidyverse, dplyr, lubridate, readxl, purrr, ggplot2,
+  scales, magrittr, stringi, stringr, tsibble, svglite, 
+  here, janitor, tidyr, officer, reticulate
+)
+```
+
+Especificación del paquete 'reticulate':
+
+**reticulate**: Esta librería se utiliza para conecta R con Python. Permite ejecutar código Python desde R, usar librerías de Python y transferir datos entre R y Python.
+
+# Funciones y catálogos
+```{r eval = FALSE}
+# Función para eliminar acentos de palabras
+reemplazo_acentos <- function(x) {
+  x |> 
+    toupper() |> 
+    trimws() |> 
+    str_replace_all(c("Á" = "A", "É" = "E", "Í" = "I", "Ó" = "O", "Ú" = "U"))
+}
+
+# Para el análisis por entidad federativa creamos un catálogo de entidades
+idestado = 1:33
+
+# Nombres oficiales correctos, con mayúsculas y acentos
+entidad = c(
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
+  "Coahuila de Zaragoza", "Colima", "Chiapas", "Chihuahua", "Ciudad de México",
+  "Durango", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Estado de México",
+  "Michoacán de Ocampo", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
+  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco",
+  "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán",
+  "Zacatecas", "Se Desconoce"
+)
+
+# Crear el dataframe
+catalogo_estados = data.frame(idestado, entidad)
+
+# --- Función para leer el comprimido de RNPDNO ----
+# Función de decarga de base de datos del RNPDNO actualizada
+source(here::here("RNPDNO", "scripts",
+       "funcion_base_final_procesada.R"))
+
+# --- Función para saber si la víctima cuenta con curp válida -----
+curp_regex <- "^[A-Z]{4}\\d{6}[HM]"
+curp_regex2 <- "[A-Z]{3}.{2}$"
+
+# Códigos de estado válidos en las curps
+codigos_validos_curp <- c(
+  "AS", "BC", "BS", "CC", "CL", "CM", "CS", "CH", "DF", "DG", "GT", "GR",
+  "HG", "JC", "MC", "MN", "MS", "NT", "NL", "OC", "PL", "QT", "QR", "SP",
+  "SL", "SR", "TC", "TS", "TL", "VZ", "YN", "ZS", "NE")
+
+es_curp_valida <- function(curp) {
+  grepl(curp_regex, curp, ignore.case = TRUE) &
+    grepl(curp_regex2, curp, ignore.case = TRUE) &
+    nchar(curp) == 18 &
+    substr(curp, 12, 13) %in% codigos_validos_curp
+}
+
+# Catálogo de entidades federativas
+cat_estados <- c(
+  "AGUASCALIENTES","BAJA CALIFORNIA","BAJA CALIFORNIA SUR","CAMPECHE","COAHUILA",
+  "COLIMA","CHIAPAS","CHIHUAHUA","CIUDAD DE MEXICO","DURANGO","GUANAJUATO",
+  "GUERRERO","HIDALGO","JALISCO","MEXICO","MICHOACAN","MORELOS","NAYARIT",
+  "NUEVO LEON","OAXACA","PUEBLA","QUERETARO","QUINTANA ROO","SAN LUIS POTOSI",
+  "SINALOA","SONORA","TABASCO","TAMAULIPAS","TLAXCALA","VERACRUZ","YUCATAN","ZACATECAS"
+)
+idestado <- 1:32
+
+catalogo_estados <- tibble(
+  id_estado = idestado,   
+  estado    = cat_estados
+)
+
+# ---- Función para dividir nombres problemáticos (versión 2. Última modificación: enero 2026) ------
+funcion_dividir_nombre_completo <- function(nombre_completo) {
+  
+  # Caso cero: Hay solo NAs en el nombre completo
+  if (is.na(nombre_completo)) {
+    return(list(nombres_corregido = NA_character_, 
+                primer_apellido_corregido = NA_character_, 
+                segundo_apellido_corregido = NA_character_))
+  }
+  
+  # Primera limpieza
+  nombre_limpio <- str_squish(nombre_completo)
+  regex_preposiciones <- regex("\\b(de\\s+la|de\\s+las|de\\s+los|de|del|la|las|los|y)\\s+",
+                               ignore_case = TRUE)
+  
+  # Preprocesamos los nombres considerando las preposiciones
+  nombre_pre_procesado <- str_replace_all(
+    nombre_limpio, 
+    regex_preposiciones, 
+    ~ str_replace_all(.x, "\\s+", "_") 
+  )
+  
+  partes <- str_split(nombre_pre_procesado, " ")[[1]]
+  partes <- partes[partes != ""]
+  n <- length(partes)
+  
+  if (n >= 3) {
+    # Regla de asignación: los últimos dos son los apellidos.
+    # Todo lo anterior son los nombres
+    res <- list(
+      nombres_corregido = paste(partes[1:(n-2)], collapse = " "),
+      primer_apellido_corregido = partes[n-1],
+      segundo_apellido_corregido = partes[n]
+    )
+  } else if (n == 2) {
+    # Solo dos partes: asumimos Nombre + Apellido Paterno
+    res <- list(
+      nombres_corregido = partes[1],
+      primer_apellido_corregido = partes[2],
+      segundo_apellido_corregido = NA_character_
+    )
+  } else {
+    # Una sola palabra o caso raro
+    res <- list(
+      nombres_corregido = nombre_completo,
+      primer_apellido_corregido = NA_character_,
+      segundo_apellido_corregido = NA_character_
+    )
+  }
+  
+  # Limpieza final: quitar guiones bajos de todos los elementos
+  return(lapply(res, function(x) str_replace_all(x, "_", " ")))
+}
+
+```
+
+# Bases de datos
+```{r eval = FALSE}
+# ---- BANCI -----
+# Ruta de archivos de Secretariado originales
+subeR <- readxl::read_excel(here("RNPDNO",
+                        "input",
+                        "datos_de_fiscalias",
+                        "datos_originales",
+                        "SubeR_Desaparecidos_FEB26.xlsx"), sheet = 1,
+                        col_types = "text" # Leemos todo como texto para no perder datos
+                        ) |> 
+  clean_names()
+
+# Número de registros de la BANCI histórico
+# Al corte 2025-01-09 hay 13,666 registros
+# Al corte 2026-01-31 hay 13,006 registros
+# Al corte 2026-03-01 hay 14,942 registros
+
+# ---- RNPDNO----
+# Cambiar el parámetro de la función para cargar base final de diferente corte
+comprimido <- procesamiento_base_final("2026-03-13")
+
+fecha_actual <- today()
+cat("A la fecha", fecha_actual, "hay", comma(nrow(comprimido)), "registros.", "\n")
+
+# 387,247 registros el 18 de diciembre de 2025
+# 387,439 registros el 21 de diciembre de 2025
+# 388,388 registros el 07 de enero de 2026
+# 389,049 registros al 19 de enero de 2026
+# 389,501 registros al 26 de enero de 2026
+# 389,956 registros al 31 de enero de 2026
+# 392,290 registros al 28 de febrero de 2026
+# 393,670 registros al 03 de marzo de 2026
+
+# ---- Registros administrativos -----
+registros <- openxlsx::read.xlsx(here::here("RNPDNO",
+             "output",
+             "resultados_final_confrontas",
+             "tabla_con_indicios_reducido_13022026.xlsx"))
+
+# ---- Catálogo INEGI -----
+catalogo_municipios_inegi <- read_csv(here::here("RNPDNO",
+                                                 "input",
+                                                 "catalogos_inegi",
+                                                 "catalogo_municipios_inegi.csv"))
+
+```
+
+# Limpieza y manejo de variables del RNPDNO
+
+Para tratar los datos del RNPDNO se siguieron los siguientes pasos:
+
+\begin{enumerate}[label = \roman*)]
+  \item \textbf{Consistencia y ajustes cronológicos:} se aplicaron reglas de integridad temporal para corregir inconsistencias en los registros de fechas:
+    \begin{itemize}
+      \item \textbf{Imputación de localización:} para registros con estatus ``Localizados`` que carecían de fecha, se igualó la fecha de localización a la de hechos ($f_{\text{loc}} = f_{\text{hechos}}$).
+      \item \textbf{Corrección de anacronismos:} en casos donde la fecha de hechos era posterior a la de localización, se ajustó la primera para que coincidiera con la segunda, asegurando la lógica causal $f_{\text{hechos}} \leq f_{\text{loc}}$.
+      \item \textbf{Variables de agregación:} se generaron columnas de control para año, mes y una variable combinada de periodicidad mensual (\texttt{anio\_mes}) para análisis de series de tiempo.
+    \end{itemize}
+
+  \item \textbf{Normalización de identidad y geografía:} se estandarizaron los datos personales y de ubicación:
+    \begin{itemize}
+      \item \textbf{Identidad:} se consolidó el nombre completo de la víctima y se aplicó una limpieza de diacríticos (acentos) para mejorar la calidad de las futuras confrontas.
+      \item \textbf{Catálogo estatal:} se integró la información de entidades federativas, clasificando el ID 33 específicamente como ``Nacido en el extranjero`` para diferenciar la migración del registro nacional.
+    \end{itemize}
+
+  \item \textbf{Integración de registros administrativos (confrontas):} se realizó un cruce de datos (\textit{left join}) con la base de registros administrativos mediante el fub. Aquellos registros sin coincidencia se marcaron explícitamente como ``sin registro administrativo`` para identificar la falta de indicios de vida institucionales.
+
+  \item \textbf{Reclasificación de carpetas de investigación y dependencia de origen:}
+    \begin{itemize}
+      \item \textbf{Estatus del expediente:} se transformó la indicadora de carpeta para distinguir entre ``carpeta de investigación`` y ``expediente genérico``.
+      \item \textbf{Tipología de dependencia:} se agruparon las autoridades informantes mediante patrones de texto para identificar: \textit{Fiscalías} (subdivididas por tipo de expediente), \textit{Comisiones de Búsqueda} (Nacional y Locales) y \textit{Portales digitales}.
+    \end{itemize}
+
+  \item \textbf{Segmentación del universo de análisis:} finalmente, se generó el subconjunto de datos \texttt{comprimido\_no\_localizados}, filtrando exclusivamente a las personas que permanecen con estatus de desaparecidas o no localizadas, constituyendo este el insumo principal para el \textit{match} con la BANCI.
+\end{enumerate}
+
+```{r eval = FALSE}
+# ------ Añadimos nuevas variables ------
+# Imputar fecha de localización igual a fecha de desaparición
+comprimido <- comprimido |> 
+  mutate(fechalocaliza_imputada = if_else(
+    is.na(fechalocaliza) & clasificacion_des == "Localizados", 
+    fecha_hechos_modificada, 
+    fechalocaliza
+  ))
+
+# Definimos variable de año
+comprimido$anio_loc_imputada = year(comprimido$fechalocaliza_imputada)
+
+# Cuando la fecha de hechos es mayor a la fecha de localización, se sustituye la fecha de hechos por la de localización. Esto se debe a un problema administrativo, ya que es imposible que una persona sea localizada antes de su desaparición
+comprimido <- comprimido %>% 
+  mutate(fecha_hechos_modificada = case_when(
+    fecha_hechos_modificada > fechalocaliza_imputada ~ fechalocaliza_imputada, 
+    TRUE ~ fecha_hechos_modificada
+  ))
+
+# Definimos variable de año
+comprimido$anio_hechos_modificada = year(comprimido$fecha_hechos_modificada)
+
+# ---- Variables por mes -----
+
+# Definimos variable de año
+comprimido$anio_hechos_modificada = year(comprimido$fecha_hechos_modificada)
+
+# Definimos variable de mes
+comprimido$mes_hechos_modificada = month(comprimido$fecha_hechos_modificada)
+
+comprimido$mes_loc_imputada = month(comprimido$fechalocaliza_imputada)
+
+# Corrección en fechas (hacemos una fecha de Año-mes para anio_mes_hechos_modificada y anio_mes_loc_imputada)
+comprimido = comprimido %>% 
+  mutate(
+    anio_mes_hechos_modificada = make_date(anio_hechos_modificada, mes_hechos_modificada, 1),
+    anio_mes_loc_imputada = make_date(anio_loc_imputada,
+                                      mes_loc_imputada, 1)
+  )
+
+# Añadimos variable de nombre completo
+comprimido <- comprimido |> 
+  mutate(nombre_completo_victima = paste(
+    nombre_vic, primerapellido_vic, segundoapellido_vic, sep = " "
+  )) 
+
+# Reemplazamos acentos de la variable de nombre completo
+comprimido <- comprimido |> 
+  mutate(nombre_completo_victima = reemplazo_acentos(nombre_completo_victima))
+
+# Pegamos el catálogo de estados con rnpdno (comprimido)
+comprimido <- comprimido |> 
+  left_join(catalogo_estados, by = c("idestado" = "id_estado"))
+
+comprimido <- comprimido |> 
+  mutate(estado = if_else(idestado == 33, "Nacido en el extranjero", estado))
+
+# ----- Añadimos información de confrontas ------ 
+
+# Por practicidad fijamos todos los indicios de vida (incluyendo fallecidos) como "con registros administrativo"
+registros <- registros |> 
+  mutate(
+    indicadora_indicio_de_vida = case_when(
+      indicadora_indicio_de_vida == "con registro administrativo" ~ "con registro administrativo",
+      indicadora_indicio_de_vida == "defuncion" ~ "con registro administrativo",
+      TRUE ~ "sin registro administrativo"
+    )
+  )
+
+# Cruzamos los registros administrativos con la comprimido
+comprimido <- comprimido |> 
+  left_join(registros |> 
+              select(fub, indicadora_indicio_de_vida),
+            by = "fub")
+
+# Completamos la variable de indicadora de registros
+comprimido <- comprimido |> 
+  mutate(indicadora_indicio_de_vida = case_when(
+    is.na(indicadora_indicio_de_vida) ~ "sin registro administrativo",
+    TRUE ~ indicadora_indicio_de_vida
+  ))
+
+# ------ Reclasificación de variables ------
+
+# Un caso con indicadora_carpeta == "con carpeta" se clasificará como "carpeta de investigación". Igualmente, si el valor de indicadora_carpeta es "sin carpeta" (es decir, con expediente no válido como carpeta de investigación o con valor vacío) entonces se clasifica como "expediente genérico"
+
+comprimido <- comprimido |> 
+  mutate(
+    expediente_reclasif = case_when(
+      indicadora_carpeta == "Con carpeta" ~ "carpeta de investigacion",
+      indicadora_carpeta == "Sin carpeta" ~ "expediente genérico"
+    )
+  )
+
+comprimido <- comprimido |> 
+  mutate(dependencia_origen_reclasificado = case_when(
+    
+    # 1. FISCALÍAS (Con su subdivisión interna)
+    grepl("FISCALIA|FISCAL|PROCURADUR|SUBPROCURADURIA", dependencia_origen, ignore.case = TRUE) & 
+      expediente_reclasif == "carpeta de investigacion" ~ "Fiscalía con carpeta de investigación",
+    
+    grepl("FISCALIA|FISCAL|PROCURADUR|SUBPROCURADURIA", dependencia_origen, ignore.case = TRUE) & 
+      expediente_reclasif == "expediente genérico" ~ "Fiscalía con expediente genérico",
+    
+    # Por si hay alguna fiscalía que no tiene ni CI ni expediente genérico
+    grepl("FISCALIA|FISCAL|PROCURADUR|SUBPROCURADURIA", dependencia_origen, ignore.case = TRUE) ~ "Fiscalía (otra)",
+    
+    # 2. COMISIONES (Específicas)
+    grepl("^COMISION NACIONAL DE BUSQUEDA", dependencia_origen, ignore.case = TRUE) ~ "Comisión Nacional de búsqueda de personas",
+    grepl("^COMISION LOCAL", dependencia_origen, ignore.case = TRUE) ~ "Comisión local de búsqueda de personas",
+    
+    # 3. Otras categorías
+    grepl("^COMISI", dependencia_origen, ignore.case = TRUE) ~ "OTRA COMISION",
+    grepl("^PORTAL", dependencia_origen, ignore.case = TRUE) ~ "Portal",
+    
+    # 4. Lo que no entró en nada de lo anterior, se queda como estaba
+    TRUE ~ dependencia_origen
+  ))
+
+# Definimos a los no localizados o desaparecidos del RNPDNO
+comprimido_no_localizados <- comprimido |> 
+  filter(!clasificacion_des %in% "Localizados")
+
+```
+
+# Limpieza y manejo de variables de la BANCI
+
+El flujo de trabajo para la depuración de la base de datos se resume en los siguientes componentes metodológicos:
+
+\begin{enumerate}[label = \roman*)]
+  \item \textbf{Reparación y limpieza de campos de identidad:} se implementó un proceso de normalización para corregir errores de captura en los nombres de las víctimas:
+    \begin{itemize}
+      \item \textbf{Segmentación de nombres:} mediante el uso de \texttt{purrr::map} y una función personalizada, se detectaron registros donde los apellidos estaban ausentes o mal distribuidos, redistribuyendo el texto del campo \texttt{nombres} hacia las columnas de apellidos correspondientes.
+      \item \textbf{Tratamiento de nulos:} se identificaron valores inconsistentes (como el carácter ``0``) en las columnas de identidad, sustituyéndolos sistemáticamente por \texttt{NA\_character\_} para asegurar la integridad de los cruces.
+    \end{itemize}
+
+  \item \textbf{Validación de CURP e integridad temporal:} se verificó la consistencia técnica de las llaves de identificación y la lógica cronológica de los hechos:
+    \begin{itemize}
+      \item \textbf{Normalización de CURP:} se eliminaron espacios en blanco y caracteres especiales, evaluando la validez técnica de la clave antes y después de la limpieza para maximizar la recuperación de registros.
+      \item \textbf{Filtro cronológico:} se transformó la variable \texttt{fha\_de\_hchos} al tipo \textit{Date} y se eliminaron los registros anteriores a 1900 (erróneos).
+    \end{itemize}
+
+  \item \textbf{Validez de nombre y detección de ruido:} mediante el uso de ($\text{regex}$) se identifican los casos con error en el registro de sus nombres:
+    \begin{itemize}
+      \item \textbf{Detección de ruido:} se clasificaron como inválidos los registros que contenían términos descriptivos (ej. ``RESTOS ÓSEOS``, ``DESCONOCIDO``) o abreviaturas técnicas (ej. ``SD``, ``NA``).
+      \item \textbf{Reglas de formato:} se marcaron como inválidos los nombres con presencia de dígitos o con una longitud total inferior a 11 caracteres. Asimismo, se eliminaron acentos para estandarizar la variable \texttt{nombre\_completo\_victima}.
+    \end{itemize}
+
+  \item \textbf{Indentificador de identidad válida e insumos de revisión:}
+    \begin{itemize}
+      \item \textbf{Indicador de identidad:} se definió que un registro posee identidad válida si cumple con la condición: $\text{CURP}_{\text{valida}} \lor \text{Nombre}_{\text{valido}}$.
+      \item \textbf{Insumos para revisión:} se aisló el subconjunto de registros que carecen de identidad válida para ser devueltos a las fiscalías y al Secretariado, permitiendo la corrección dirigida de la información.
+    \end{itemize}
+
+  \item \textbf{Diagnóstico de cumplimiento por reforma legal:} se analizó el flujo de información a partir de la reforma de agosto de 2025:
+    \begin{itemize}
+      \item \textbf{Seguimiento post-reforma:} se filtraron los casos ocurridos desde el $01/08/2025$ para evaluar la adopción de los nuevos lineamientos en materia de desaparición.
+    \end{itemize}
+\end{enumerate}
+
+```{r eval = FALSE}
+# --------------------------------------------------------- #
+# HARD-coding 
+cat("¡DETENTE! Debemos primero actualizar la siguiente fecha: maximo_fechas_banci")
+maximo_fechas_banci <- as.Date("2026-02-28")
+
+# --------------------------------------------------------- #
+# Corección de formatos de fechas (convertimos a fecha detectando si hay separación por "-" o por "/") ----
+# --------------------------------------------------------- #
+
+# Función para limpiar fechas mixtas (números de Excel y texto)
+limpiar_y_avisar <- function(x) {
+  # 1. Detectar si hay algo que NO sea número ni guion (ej. "/" o ".")
+  raros <- str_subset(x, "[^-0-9]") |> unique() |> na.omit()
+  
+  if(length(raros) > 0) {
+    message(paste("Ojo: Detecté símbolos extraños en las fechas:", paste(raros, collapse = " ")))
+  }
+  
+  # 2. Lógica de limpieza
+  case_when(
+    str_detect(x, "-") ~ as.Date(x, format = "%Y-%m-%d"), # Caso guiones
+    str_detect(x, "/") ~ as.Date(x, format = "%d/%m/%Y"), # Caso Diagonales (por si acaso)
+    TRUE ~ excel_numeric_to_date(as.numeric(x))           # Caso Números Excel
+  )
+}
+
+subeR <- subeR |> 
+  mutate(across(matches("^fha|^fecha"), limpiar_y_avisar))
+
+# --------------------------------------------------------- #
+# Corección datos con fha_hechos mal etiquetadas (corte 31 de enero de 2026) ----
+# --------------------------------------------------------- #
+subeR <- subeR |> 
+  mutate(
+    fha_de_hchos = if_else(fha_de_hchos >= maximo_fechas_banci, 
+                            fha_de_hchos - years(1), 
+                            fha_de_hchos)
+  )
+
+# Corregimos procesamiento de nombres
+# Usamos función "funcion_dividir_nombre_completo"
+subeR <- subeR |> 
+  mutate(
+    # Identificar casos problemáticos
+    necesita_correccion = !is.na(nombres) & (is.na(primer_apellido) | is.na(segundo_apellido)),
+    
+    # Aplicar la función solo a los casos problemáticos
+    temp_resultado = ifelse(
+      necesita_correccion,
+      map(nombres, funcion_dividir_nombre_completo),
+      list(list(
+        nombres_corregido = NA_character_,
+        primer_apellido_corregido = NA_character_,
+        segundo_apellido_corregido = NA_character_
+      ))
+    ),
+    
+    # Extraer los resultados
+    nuevos_nombres = map_chr(temp_resultado, ~ .x$nombres_corregido),
+    nuevo_primer_apellido = map_chr(temp_resultado, ~ .x$primer_apellido_corregido),
+    nuevo_segundo_apellido = map_chr(temp_resultado, ~ .x$segundo_apellido_corregido),
+    
+    # Actualizar las columnas originales
+    nombres = if_else(necesita_correccion, nuevos_nombres, nombres),
+    primer_apellido = if_else(necesita_correccion & !is.na(nuevo_primer_apellido), 
+                              nuevo_primer_apellido, primer_apellido),
+    segundo_apellido = if_else(necesita_correccion & !is.na(nuevo_segundo_apellido), 
+                               nuevo_segundo_apellido, segundo_apellido)
+  ) |> 
+  # Eliminar columnas temporales
+  select(-necesita_correccion, -temp_resultado, -nuevos_nombres, 
+         -nuevo_primer_apellido, -nuevo_segundo_apellido)
+
+# Eliminamos los ceros y remplazamos por NA
+subeR <- subeR |> 
+  mutate(across(c(nombres,
+                  primer_apellido, 
+                  segundo_apellido), ~ replace(.x, .x == "0", NA_character_)))
+
+
+# ---- Indicadora de curp válida -----
+
+# Quitamos TODO el espacio en blanco (espacios, tabs, saltos de línea) y mandamos a mayúsculas
+subeR <- subeR |> 
+  mutate(
+    curp_limpia = str_remove_all(curp, "\\s+"),
+    curp_limpia = str_to_upper(curp_limpia)
+  )
+
+subeR <- subeR |> 
+  mutate(indicadora_curp_valida = if_else(
+    es_curp_valida(curp), "valida", "invalida"
+  ),
+  indicadora_curp_limpia_valida = if_else(
+    es_curp_valida(curp_limpia), "valida", "invalida"
+  ))
+
+subeR <- subeR |> 
+  select(-indicadora_curp_valida)
+
+# --- Arreglar formato de fecha ---
+subeR <- subeR |> 
+  mutate(
+    fha_de_hchos = as.Date(fha_de_hchos)
+  )
+
+# Filtrar fechas imposibles
+rango_fechas_SubeR <- range(subeR$fha_de_hchos, na.rm = TRUE)
+
+cat("El rango de fechas del archivo de la BANCI es del", as.character(min(rango_fechas_SubeR)), "al",
+    as.character(max(rango_fechas_SubeR)))
+
+subeR <- subeR |> 
+  filter(fha_de_hchos > "1900-01-01")
+
+# ---- Indicador de nombre válido ----
+
+# Regex con patrones inválidos
+patron_ruido <- regex(
+  "SE DESCONOCE|RESTOS OSEOS|CUERPO|SIN VIDA|DESCONOCIDO|NO IDENTIFICADO|\\bSD\\b|\\bNA\\b|^M$|([a-z]\\.){2,}[a-z]?", 
+  ignore_case = TRUE
+)
+
+subeR <- subeR |> 
+  mutate(nombre_completo_victima = str_squish(paste(nombres, primer_apellido, segundo_apellido))) |> 
+  mutate(indicadora_nombre_valido = case_when(
+    # Caso 1: Es NA
+    is.na(nombre_completo_victima) ~ "invalido",
+    
+    # Caso 2: Tiene números
+    str_detect(nombre_completo_victima, "\\d") ~ "invalido",
+    
+    # Caso 3: Contiene palabras prohibidas o abreviaturas 
+    str_detect(nombre_completo_victima, patron_ruido) ~ "invalido",
+    
+    # Caso 4: Es demasiado corto (menos de 11 caracteres)
+    nchar(nombre_completo_victima) < 11 ~ "invalido",
+    
+    TRUE ~ "valido"
+  )) 
+
+# Reemplazamos acentos de la variable de nombre completo
+subeR <- subeR |> 
+  mutate(nombre_completo_victima = reemplazo_acentos(nombre_completo_victima))
+
+# --- Variable de identidad válida (CURP válida o nombre válido) ---
+
+subeR <- subeR |> 
+  mutate(indicadora_identidad_valida = if_else(
+    indicadora_curp_limpia_valida == "valida" | indicadora_nombre_valido == "valido", 
+    "valida", "invalida"
+  ))
+
+# Vemos cuántos tienen idéntidad válida
+subeR |> 
+  filter(indicadora_identidad_valida == "valida") |> 
+  nrow()
+  
+# ---- Renombrar variable de entidad federativa que se usará para match (OPCIONAL según metodología de match a usar) ----
+
+# Entidad que se ocupará para el análisis
+subeR <- subeR |> 
+  rename(entidad_reporta = entidad)
+
+subeR$entidad_reporta %>% unique
+
+# Arreglar inconsistencias en "entidad_reporta"
+subeR <- subeR |> 
+  mutate(
+    entidad_reporta = case_when(
+      entidad_reporta == "OAXACA" ~ "Oaxaca",
+      entidad_reporta == "Ciudad De Mexico" ~ "Ciudad de Mexico",
+      TRUE ~ entidad_reporta
+    )
+  )
+
+# # Quitar acentos a "entidad_reporta"
+# subeR <- subeR |> 
+#   mutate(
+#     entidad_reporta = stri_trans_general(entidad_reporta , "Latin-ASCII")
+#   )
+
+# # --- Extra: identificar las columnas que no tengan ni CURP ni nombre válido para regresarlos al Secretariado y que esta institución pueda canalizar a las fiscalías ----
+
+# necesitan_revision <- subeR |> 
+#   mutate(nombre_completo_victima = str_squish(paste(nombres, primer_apellido, segundo_apellido))) |> 
+#   mutate(indicadora_nombre_valido = case_when(
+
+#     # Caso 1: Es NA
+#     is.na(nombre_completo_victima) ~ "invalido",
+    
+#     # Caso 2: Tiene números
+#     str_detect(nombre_completo_victima, "\\d") ~ "invalido",
+    
+#     # Caso 3: Contiene palabras prohibidas o abreviaturas 
+#     str_detect(nombre_completo_victima, patron_ruido) ~ "invalido",
+    
+#     # Caso 4: Es demasiado corto (menos de 11 caracteres)
+#     nchar(nombre_completo_victima) < 11 ~ "invalido",
+    
+#     TRUE ~ "valido"
+#   )) |> 
+#   filter(indicadora_curp_limpia_valida == "invalida" & indicadora_nombre_valido == "invalido")
+
+# necesitan_revision <- necesitan_revision |> 
+#   filter(fha_de_hchos > "1900-01-01")
+
+# nrow(necesitan_revision)
+
+# # Guardar
+# writexl::write_xlsx(
+#   necesitan_revision, 
+#   here::here("datos_carpetas_fiscalias",
+#              "insumos_generados_BANCI",
+#              "subeR_diciembre17_necesitan_revision.xlsx"))
+
+# Extra 2. Identificar a aquellos estados que no tienen información de desapariciones a partir de agosto de 2025 (fecha de entrada en vigor de la reforma a la ley en materia de desaparición de personas) ----------
+
+# Corregir typos en localizado_o_no_localizado
+subeR <- subeR |> 
+  mutate(
+    localizado_o_no_localizado = case_when(
+      localizado_o_no_localizado == "NO LOCALIZADA" ~ "No localizada",
+      localizado_o_no_localizado == "LOCALIZADA" ~ "Localizada",
+      TRUE ~ localizado_o_no_localizado
+    )
+  )
+
+subeR_desapariciones_desde_agosto <- subeR |> 
+  filter(fha_de_hchos >= "2025-08-01",
+         localizado_o_no_localizado == "No localizada")
+
+cat("El número de casos no localizados en Banci desde agosto es de:", subeR_desapariciones_desde_agosto |> 
+      nrow())
+
+entidad_desapariciones_desde_agosto <- subeR_desapariciones_desde_agosto |>
+  count(entidad_reporta) |> 
+  rename(casos_de_desaparicion = n)
+
+# Pegamos con el catálogo de estados para identificar los que tienen valores bien
+entidad_desapariciones_desde_agosto <- entidad_desapariciones_desde_agosto |> 
+  full_join(
+    catalogo_estados |> 
+      mutate(estado = str_to_title(estado)) |> 
+      mutate(estado = case_when(
+        estado == "Ciudad De Mexico" ~ "Ciudad de Mexico",
+        TRUE ~ estado
+      )) |> 
+      select(-id_estado),
+    by = c("entidad_reporta" = "estado")
+  )
+
+entidad_desapariciones_desde_agosto <- entidad_desapariciones_desde_agosto |> 
+  mutate(across(where(is.numeric), ~ replace_na(.x, 0)))
+
+# # Guardar
+# writexl::write_xlsx(
+#   entidad_desapariciones_desde_agosto, 
+#   here::here("datos_carpetas_fiscalias",
+#              "insumos_generados_BANCI",
+#              "entidad_desapariciones_desde_agosto_subeR_dic17.xlsx"))
+
+```
+
+
+# Primera función de match entre BANCI y RNPDNO
+
+Esta función genera los siguientes insumos:
+
+1. Base de coincidencias encontradas entre la BANCI y RNPDNO
+2. Base de datos sin coincidencias entre BANCI y RNPDNO.
+
+```{r eval = FALSE}
+# fecha de corte de BANCI (actualizar a último corte disponible)
+fecha_inicio_BANCI <- "2025-08-01"
+fecha_fin_BANCI <- "2026-02-28"
+
+funcion_de_match_BANCI_y_RNPDNO <- function(subeR, comprimido) {
+  
+  # ----------------------------------------------------
+  # 1. Preparación de la BANCI 
+  # ----------------------------------------------------
+  
+  # 1.1. Solo quedarnos con personas NO localizadas
+  subeR_no_localizados <- subeR |> 
+  filter(localizado_o_no_localizado == "No localizada")
+  
+  # 1.2. Definir fecha de corte de BANCI
+  subeR_no_localizados <- subeR_no_localizados |> 
+    filter(fha_de_hchos >= fecha_inicio_BANCI & 
+           fha_de_hchos < fecha_fin_BANCI)
+
+  cat("El número de personas desaparecidas totales en SubeR son: ",
+  comma(nrow(subeR_no_localizados)), "\n")
+  
+  # 1.3. Creamos indicador de cada fila
+  subeR_no_localizados$indicador <- 1:nrow(subeR_no_localizados)
+  
+  # Cambio del 09 de enero de 2025: de esta fecha en adelante se considerarán todos los registros de 'no localizados' de la BANCI, es decir, también aquellas filas que no cuentan con nombre o con curp. Para no alterar el proceso de deduplicación y limpieza de datos (pasos 1.5 a 1.7 del código), debemos agregar aquellos datos que cumplen con indicadora_identidad_valida == "invalida" al final de la función
+  
+  # 1.4. Limpiamos alguas columnas de la base 'SubeR_no_localizados'
+  subeR_no_localizados <- subeR_no_localizados |> 
+    mutate(
+      indicadora_identidad_valida = trimws(tolower(indicadora_identidad_valida)),
+      
+      # Convertimos strings vacíos en NAs reales si los hubiera
+      folio_rnpdno = ifelse(folio_rnpdno == "", NA, folio_rnpdno)
+    )
+
+  # 1.5. Filtramos aquellos que tienen identidad válida o que tienen fub no vacía
+  subeR_no_localizados_identidad_valida <- subeR_no_localizados |> 
+   filter(indicadora_identidad_valida == "valida" |
+           !is.na(folio_rnpdno)) 
+  
+  cat("El número de personas desaparecidas con idéntidad válida en SubeR son: ",
+      comma(nrow(subeR_no_localizados_identidad_valida)), "\n")
+  
+  # Adicionalmente también separamos a las personas desaparecidas sin identidad válida
+  subeR_no_localizados_sin_identidad_valida <- subeR_no_localizados |> 
+   filter(indicadora_identidad_valida == "invalida" &
+           is.na(folio_rnpdno)) 
+  
+  cat("El número de personas desaparecidas que NO tienen identidad válida son", comma(nrow(subeR_no_localizados_sin_identidad_valida)), "\n")
+  
+  # 1.6 Ordenamos por fecha de hechos en forma descendente para quedarse con el último
+  subeR_no_localizados_identidad_valida <-
+    subeR_no_localizados_identidad_valida |> 
+  arrange(desc(fha_de_hchos))
+  
+  # 1.7. Eliminar curps repetidas
+  subeR_no_localizados_identidad_valida_curp <- subeR_no_localizados_identidad_valida %>%
+  filter(indicadora_curp_limpia_valida == "valida")
+  
+  subeR_no_localizados_identidad_invalida_curp <- subeR_no_localizados_identidad_valida %>%
+  filter(indicadora_curp_limpia_valida == "invalida")
+  
+  subeR_no_localizados_identidad_valida_curp <-
+    subeR_no_localizados_identidad_valida_curp |> 
+    distinct(curp, .keep_all = T)
+  
+  subeR_no_localizados_identidad_valida <- subeR_no_localizados_identidad_valida_curp |> 
+  bind_rows(subeR_no_localizados_identidad_invalida_curp)
+  
+  rm(subeR_no_localizados_identidad_valida_curp, subeR_no_localizados_identidad_invalida_curp)
+  
+  # 1.8. Eliminar nombres repetidos (que además cumplan con otro criterio)
+  
+  # Usamos fecha inicio como verificador de que se trata de la misma persona
+  cat("De manera esperada, no hay NAs en la variable 'fecha_inicio' (aquella que se usa como verificadora de que se trata de la misma persona en caso de mismo nombre):", sum(is.na(subeR_no_localizados_identidad_valida$fha_de_ini)),"NAs",
+      "\n")
+  
+  subeR_no_localizados_identidad_valida <-
+    subeR_no_localizados_identidad_valida |> 
+    mutate(nombre_concat = paste0(nombre_completo_victima, fha_de_ini))
+  
+  subeR_no_localizados_identidad_valida_nombre_valido <- subeR_no_localizados_identidad_valida |> 
+  filter(indicadora_nombre_valido == "valido")
+  
+  subeR_no_localizados_identidad_valida_nombre_invalido <- subeR_no_localizados_identidad_valida |> 
+  filter(indicadora_nombre_valido == "invalido")
+  
+  subeR_no_localizados_identidad_valida_nombre_valido <-
+    subeR_no_localizados_identidad_valida_nombre_valido |> 
+  distinct(nombre_concat, .keep_all = T)
+  
+  subeR_no_localizados_identidad_valida <- subeR_no_localizados_identidad_valida_nombre_valido |> 
+  bind_rows(subeR_no_localizados_identidad_valida_nombre_invalido)
+  
+  rm(subeR_no_localizados_identidad_valida_nombre_valido, 
+   subeR_no_localizados_identidad_valida_nombre_invalido)
+
+  # ----------------------------------------------------
+  # 2. Preparación de RNPDNO
+  # ----------------------------------------------------
+  
+  # ------ No localizados -------
+  
+  # 2.1. Quedarnos con solo personas NO localizadas
+  comprimido_no_localizados <- comprimido |> 
+  filter(!clasificacion_des %in% "Localizados")
+  
+  # 2.2. Seleccionar variables relevantes del RNPDNO
+  comprimido_no_localizados_abr <- comprimido_no_localizados %>%
+  select(
+    fub, curp_victima, nombre_completo_victima, fecha_nacimiento = fechanacimiento, 
+    fecha_hechos = fechahechos, entidad_hechos = estado, indicadora_carpeta,
+    clasificacion_des, sexo)
+
+  # 2.3. Añadimos sufijos de nombres
+  names(comprimido_no_localizados_abr) <- paste0(
+  names(comprimido_no_localizados_abr), "_rnpdno"
+)
+  comprimido_no_localizados_abr$indicadora_rnpdno <- "rnpdno"
+  
+  # ------ Localizados -------
+  
+  # 2.4. Hacer un subset de personas localizadas
+  comprimido_localizados <- comprimido |> 
+    filter(clasificacion_des %in% "Localizados")
+  
+  # 2.5. Seleccionar variables relevantes del RNPDNO
+  comprimido_localizados_abr <- comprimido_localizados %>%
+  select(
+    fub, curp_victima, nombre_completo_victima, fecha_nacimiento = fechanacimiento, 
+    fecha_hechos = fechahechos, entidad_hechos = estado, indicadora_carpeta,
+    clasificacion_des, sexo)
+
+  # 2.6. Añadimos sufijos de nombres
+  names(comprimido_localizados_abr) <- paste0(
+  names(comprimido_localizados_abr), "_rnpdno"
+)
+  comprimido_localizados_abr$indicadora_rnpdno <- "rnpdno"
+  
+  # ----------------------------------------------------
+  # 3. Pre-tratamiento para el matching
+  # ----------------------------------------------------
+  
+  # ---- Sube R -----
+  
+  # 3.1. Creamos columna 'nombre_completo_mas_fub', la cual nos será útil para el match fub + nombre
+  subeR_no_localizados_identidad_valida <- subeR_no_localizados_identidad_valida |> 
+  mutate(nombre_completo_mas_fub = str_squish(toupper(paste(
+    nombre_completo_victima, folio_rnpdno, sep = " "
+  ))))
+  
+  # ----- Desaparecidos en RNPDNO -----
+  
+  # 3.2. Crear indicadora de match con fub + nombre de la víctima en RNPDNO desaparecidos
+  comprimido_no_localizados_abr <- comprimido_no_localizados_abr |> 
+    mutate(nombre_completo_mas_fub = str_squish(toupper(paste(
+    nombre_completo_victima_rnpdno, fub_rnpdno, sep = " "
+  ))))
+  
+  # ----- Localizados de RNPDNO ------
+  
+  # 3.3. Crear indicadora de match con fub + nombre de la víctima en RNPDNO localizados
+  comprimido_localizados_abr <- comprimido_localizados_abr |> 
+    mutate(nombre_completo_mas_fub = str_squish(toupper(paste(
+    nombre_completo_victima_rnpdno, fub_rnpdno, sep = " "
+  ))))
+  
+  # ----------------------------------------------------
+  # 4. Match jerárquico: es decir, solo contamos una vez cada match entre BANCI y RNPDNO
+  # ----------------------------------------------------
+
+  # Se prioriza el siguiente orden: 1. match por fub, 2. match por curp y 3. match por nombre
+  
+  # ----------------------------------------------------
+  # 4.1. Match por FUB
+  # ----------------------------------------------------
+  
+  # 4.1.1 Creamos la tabla de FUB MATCHES (desparecidos_secretariado_fub_match)
+  desparecidos_fub_match_temp <- subeR_no_localizados_identidad_valida |>
+    mutate(tipo_match = case_when(nombre_completo_mas_fub %in% comprimido_no_localizados_abr$nombre_completo_mas_fub ~ "match_fub",
+                                  TRUE ~ NA_character_))
+  
+  # 4.1.2 Intentamos hacer el match con las personas localizadas de RNPDNO siempre y cuando la fecha de desaparición sea la misma
+  comprimido_localizados_abr <- comprimido_localizados_abr |> 
+    mutate(nombre_completo_mas_fub_con_fecha = paste0(nombre_completo_mas_fub,
+                                                      fecha_hechos_rnpdno))
+  
+  desparecidos_fub_match_temp <- desparecidos_fub_match_temp |> 
+  mutate(nombre_completo_mas_fub_con_fecha = paste0(nombre_completo_mas_fub, fha_de_hchos)) |> 
+    left_join(
+    comprimido_localizados_abr |> select(nombre_completo_mas_fub, fub_rnpdno, indicadora_rnpdno, fecha_hechos_rnpdno, entidad_hechos_rnpdno, fecha_nacimiento_rnpdno, indicadora_carpeta_rnpdno, nombre_completo_mas_fub_con_fecha, clasificacion_des_rnpdno), 
+    by = "nombre_completo_mas_fub",
+    suffix = c("", "_rnpdno") 
+  ) |> 
+  mutate(tipo_match = case_when(
+    !is.na(tipo_match) ~ tipo_match,
+    nombre_completo_mas_fub_con_fecha == nombre_completo_mas_fub_con_fecha_rnpdno ~ "match_fub",
+    TRUE ~ NA_character_
+  ))
+  
+  # 4.1.3. Hacemos el JOIN para traer la columnas del RPDNO en el caso de las personas que hicieron match con la base 'comprimido_no_localizados_abr'
+  desparecidos_fub_match_temp <- desparecidos_fub_match_temp |>
+  left_join(
+    comprimido_no_localizados_abr |> select(nombre_completo_mas_fub, fub_rnpdno, indicadora_rnpdno, fecha_hechos_rnpdno, entidad_hechos_rnpdno, fecha_nacimiento_rnpdno, indicadora_carpeta_rnpdno, clasificacion_des_rnpdno), 
+    by = "nombre_completo_mas_fub",
+    suffix = c("", "_rnpdno") 
+  ) |>
+  # Eliminamos la columna repetida que solo se usa para el match
+  select(-nombre_completo_mas_fub,
+         -nombre_completo_mas_fub_con_fecha)
+  
+  # 4.1.4. Limpiamos
+  desparecidos_fub_match_temp <- desparecidos_fub_match_temp |> 
+    mutate(
+      fub_rnpdno = coalesce(fub_rnpdno, fub_rnpdno_rnpdno),
+      indicadora_rnpdno = coalesce(indicadora_rnpdno, indicadora_rnpdno_rnpdno),
+      fecha_hechos_rnpdno = coalesce(fecha_hechos_rnpdno, fecha_hechos_rnpdno_rnpdno),
+      entidad_hechos_rnpdno = coalesce(entidad_hechos_rnpdno, entidad_hechos_rnpdno_rnpdno),
+      fecha_nacimiento_rnpdno = coalesce(fecha_nacimiento_rnpdno, fecha_nacimiento_rnpdno_rnpdno),
+      indicadora_carpeta_rnpdno = coalesce(indicadora_carpeta_rnpdno, indicadora_carpeta_rnpdno_rnpdno),
+      clasificacion_des_rnpdno = coalesce(clasificacion_des_rnpdno, clasificacion_des_rnpdno_rnpdno)
+    ) |> 
+    select(-c(fub_rnpdno_rnpdno, indicadora_rnpdno_rnpdno, fecha_hechos_rnpdno_rnpdno, entidad_hechos_rnpdno_rnpdno, fecha_nacimiento_rnpdno_rnpdno, indicadora_carpeta_rnpdno_rnpdno, clasificacion_des_rnpdno_rnpdno, nombre_completo_mas_fub_con_fecha_rnpdno))
+  
+  # 4.1.5 Seleccionamos solo aquellos que tienen marca de match
+  desparecidos_fub_match <- desparecidos_fub_match_temp |> 
+    filter(tipo_match == "match_fub")
+  
+  # 4.1.6 Creamos la base remanente (registros que NO hicieron match)
+  base_remanente <- desparecidos_fub_match_temp |> 
+    filter(is.na(tipo_match))
+  
+  # 4.1.7 Limpiamos columnas
+  # Nota: en 'base_remanente' hay filas no vacías en la columna 'indicadora_rnpdno'. Esto no es un error, ya que al haber hecho el join con 'comprimido_localizados' hubo coincidencias en el match fub+nombre pero como no cumplieron el requisito de que la fecha de desaparición fuese la misma NO cuentan como match.
+  base_remanente <- base_remanente |> 
+    select(-c(fub_rnpdno:clasificacion_des_rnpdno))
+  
+  # ----------------------------------------------------
+  # 4.2. Match por CURP
+  # ----------------------------------------------------
+  
+  # 4.2.1. Separamos la base remanente por CURP válida
+  remanente_curp_valida <- base_remanente |> filter(indicadora_curp_limpia_valida == "valida")
+  base_remanente_sin_curp <- base_remanente |> filter(indicadora_curp_limpia_valida == "invalida")
+  
+  # 4.2.2. Hacemos el JOIN solo con los de CURP válida de la remanente
+  desparecidos_con_y_sin_curp_match <- remanente_curp_valida |>
+    # En caso de que tengamos CURPS repetidas en BANCI (remanente_curp_valida) vamos a ordenar por fecha_inicio más reciente y cortar la cabeza
+  group_by(curp_limpia) |> 
+    slice_max(order_by = fha_de_ini, n = 1, with_ties = FALSE) |> 
+    ungroup() |> 
+    left_join(
+    comprimido_no_localizados_abr |> 
+      # Al igual que con la BANCI, también solo consideramos la fecha más reciente de desaparición de un registro duplicado por curp
+      group_by(curp_victima_rnpdno) |> 
+      slice_max(order_by = fecha_hechos_rnpdno, n = 1, with_ties = FALSE) |> 
+      ungroup() |>
+      select(curp_victima_rnpdno, indicadora_rnpdno, fub_rnpdno, indicadora_rnpdno, fecha_hechos_rnpdno, entidad_hechos_rnpdno, fecha_nacimiento_rnpdno, indicadora_carpeta_rnpdno, clasificacion_des_rnpdno), 
+    by = c("curp_limpia" = "curp_victima_rnpdno")
+  ) |>
+  # Creamos la indicadora de match
+  mutate(tipo_match = if_else(!is.na(indicadora_rnpdno), "match_curp", NA_character_))
+  
+  # 4.2.3 Hacemos el join restante con la base 'comprimido_localizados_abr'. Se aplica la condición anterior, se considera match válido sii la fecha de desaparición es la misma
+  desparecidos_con_y_sin_curp_match <- desparecidos_con_y_sin_curp_match |> 
+    mutate(curp_mas_fecha = paste0(curp_limpia, fha_de_hchos)) |> 
+    left_join(
+    comprimido_localizados_abr |>
+      mutate(curp_rnpdno_mas_fecha = paste0(curp_victima_rnpdno, fecha_hechos_rnpdno)) |> 
+      select(curp_victima_rnpdno, curp_rnpdno_mas_fecha, indicadora_rnpdno, fub_rnpdno, indicadora_rnpdno, fecha_hechos_rnpdno, entidad_hechos_rnpdno, fecha_nacimiento_rnpdno, indicadora_carpeta_rnpdno, clasificacion_des_rnpdno), 
+    by = c("curp_limpia" = "curp_victima_rnpdno")
+  ) |> 
+  mutate(tipo_match = case_when(
+    !is.na(tipo_match) ~ tipo_match,
+    curp_mas_fecha == curp_rnpdno_mas_fecha ~ "match_curp",
+    TRUE ~ NA_character_
+  )) |> 
+    select(-c(curp_mas_fecha, curp_rnpdno_mas_fecha))
+  
+  # 4.2.4 Limpiamos columnas repetidas
+  desparecidos_con_y_sin_curp_match <- desparecidos_con_y_sin_curp_match |> 
+    mutate(indicadora_rnpdno = coalesce(indicadora_rnpdno.x, indicadora_rnpdno.y),
+           fub_rnpdno = coalesce(fub_rnpdno.x, fub_rnpdno.y),
+           fecha_hechos_rnpdno = coalesce(fecha_hechos_rnpdno.x, fecha_hechos_rnpdno.y),
+           entidad_hechos_rnpdno = coalesce(entidad_hechos_rnpdno.x, entidad_hechos_rnpdno.y),
+           fecha_nacimiento_rnpdno = coalesce(fecha_nacimiento_rnpdno.x, fecha_nacimiento_rnpdno.y),
+           indicadora_carpeta_rnpdno = coalesce(indicadora_carpeta_rnpdno.x, indicadora_carpeta_rnpdno.y),
+           clasificacion_des_rnpdno = coalesce(clasificacion_des_rnpdno.x, clasificacion_des_rnpdno.y)) |> 
+    select(-ends_with(".x"), -ends_with(".y"))
+  
+  # Guardamos solo los que sí hicieron match
+  desparecidos_curp_match <- desparecidos_con_y_sin_curp_match |>
+    filter(tipo_match == "match_curp") 
+  
+  # 4.2.5. Agregamos los "NO match" de CURP a la base remanente
+  base_remanente_sin_curp <- base_remanente_sin_curp |>
+  bind_rows(
+    desparecidos_con_y_sin_curp_match |> filter(is.na(tipo_match)) # Los que no matchearon por CURP
+  )
+  
+  # 4.2.6. Limpiamos colummnas (misma lógica que en el bloque anterior)
+  base_remanente_sin_curp <- base_remanente_sin_curp |> 
+    select(-c(fub_rnpdno:clasificacion_des_rnpdno)) |> 
+    mutate(indicadora_rnpdno = NA_character_)
+  
+  # ----------------------------------------------------
+  # 4.3. Match por nombre completo
+  # ----------------------------------------------------
+  
+  # 4.3.1. Separamos la base remanente por Nombre válido
+  remanente_nombre_valido <- base_remanente_sin_curp |> filter(indicadora_nombre_valido == "valido")
+  base_final_sin_match <- base_remanente_sin_curp |> filter(indicadora_nombre_valido == "invalido")
+  
+  # 4.3.2. Hacemos el JOIN con Nombre
+  desparecidos_nombre_match_pre <- remanente_nombre_valido |>
+  left_join(
+    comprimido_no_localizados_abr |> select(nombre_completo_victima_rnpdno,
+                                            fub_rnpdno,
+                                            indicadora_rnpdno, 
+                                            fecha_hechos_rnpdno,
+                                            fecha_nacimiento_rnpdno,
+                                            entidad_hechos_rnpdno,
+                                            indicadora_carpeta_rnpdno,
+                                            clasificacion_des_rnpdno),
+    by = c("nombre_completo_victima" = "nombre_completo_victima_rnpdno")
+  ) |>
+    mutate(entidad_reporta = stri_trans_general(str_to_title(entidad_reporta), id = "Latin-ASCII"),
+           entidad_hechos_rnpdno = stri_trans_general(str_to_title(entidad_hechos_rnpdno), id = "Latin-ASCII"),
+           fha_nac = as.Date(fha_nac),
+           fecha_hechos_rnpdno = as.Date(fecha_hechos_rnpdno),
+           fha_de_hchos = as.Date(fha_de_hchos)) |> 
+  # Aplicamos la lógica de coincidencia extra
+    mutate(
+    tipo_match = case_when(
+      # 1) coincidencia exacta por fecha de nacimiento
+      !is.na(fecha_nacimiento_rnpdno) & !is.na(fha_nac) & fecha_nacimiento_rnpdno == fha_nac ~ "match_nombre",
+
+      # 2) si falta fecha de nacimiento, comparar fechas de hechos (margen 10 años)
+      !is.na(fha_de_hchos) & !is.na(fecha_hechos_rnpdno) &
+        abs(as.numeric(fha_de_hchos-fecha_hechos_rnpdno)) <= 10 &
+        !is.na(entidad_hechos_rnpdno) & !is.na(entidad_reporta) &
+        entidad_hechos_rnpdno == entidad_reporta ~ "match_nombre",
+
+      # 3) si falta cualquiera de las fechas de hechos -> no evaluable (NA)
+      is.na(fha_de_hchos) | is.na(fecha_hechos_rnpdno) ~ NA_character_,
+
+      # 4) resto -> no match / NA
+      TRUE ~ NA_character_
+    )
+  )
+  
+  # 4.3.3. Evaluamos con la base 'comprimido_localizados_abr'. Se aplica la condición anterior, se considera match válido sii la fecha de desaparición es la misma
+  desparecidos_nombre_match_pre <- desparecidos_nombre_match_pre |> 
+    left_join(
+    comprimido_localizados_abr |>
+       select(nombre_completo_victima_rnpdno,
+                                            fub_rnpdno,
+                                            indicadora_rnpdno, 
+                                            fecha_hechos_rnpdno,
+                                            fecha_nacimiento_rnpdno,
+                                            entidad_hechos_rnpdno,
+                                            indicadora_carpeta_rnpdno,
+                                            clasificacion_des_rnpdno), 
+    by = c("nombre_completo_victima" = "nombre_completo_victima_rnpdno")
+  ) |> 
+    mutate(entidad_reporta = stri_trans_general(str_to_title(entidad_reporta), id = "Latin-ASCII"),
+           entidad_hechos_rnpdno.y = stri_trans_general(str_to_title(entidad_hechos_rnpdno.y), id = "Latin-ASCII"),
+           fha_nac = as.Date(fha_nac),
+           fecha_hechos_rnpdno.y = as.Date(fecha_hechos_rnpdno.y),
+           fha_de_hchos = as.Date(fha_de_hchos)) |>
+  mutate(
+    tipo_match = case_when(
+      !is.na(tipo_match) ~ tipo_match,
+
+      # exigir que fecha de hechos coincida (requisito común)
+      !is.na(fecha_hechos_rnpdno.y) & !is.na(fha_de_hchos) & fecha_hechos_rnpdno.y == fha_de_hchos & (
+
+        # A) ambas fechas de nacimiento presentes y coinciden
+        (!is.na(fecha_nacimiento_rnpdno.y) & !is.na(fha_nac) & fecha_nacimiento_rnpdno.y == fha_nac)
+
+        |
+
+        # B) falta alguna fecha de nacimiento, pero la entidad de hechos coincide (y no es NA)
+        ((is.na(fecha_nacimiento_rnpdno.y) | is.na(fha_nac)) &
+           !is.na(entidad_hechos_rnpdno.y) & !is.na(entidad_reporta) &
+           entidad_hechos_rnpdno.y == entidad_reporta)
+      ) ~ "match_nombre",
+
+      # resto -> no evaluable / no match
+      TRUE ~ NA_character_
+    ))
+  
+  # 4.3.4. Limpiamos columnas repetidas
+  desparecidos_nombre_match_pre <- desparecidos_nombre_match_pre |> 
+    mutate(indicadora_rnpdno = coalesce(indicadora_rnpdno.x, indicadora_rnpdno),
+           fub_rnpdno = coalesce(fub_rnpdno.x, fub_rnpdno.y),
+           fecha_hechos_rnpdno = coalesce(fecha_hechos_rnpdno.x, fecha_hechos_rnpdno.y),
+           entidad_hechos_rnpdno = coalesce(entidad_hechos_rnpdno.x, entidad_hechos_rnpdno.y),
+           fecha_nacimiento_rnpdno = coalesce(fecha_nacimiento_rnpdno.x, fecha_nacimiento_rnpdno.y),
+           indicadora_carpeta_rnpdno = coalesce(indicadora_carpeta_rnpdno.x, indicadora_carpeta_rnpdno.y),
+           clasificacion_des_rnpdno = coalesce(clasificacion_des_rnpdno.x, clasificacion_des_rnpdno.y)) |> 
+    select(-ends_with(".x"), -ends_with(".y"))
+  
+  
+  # 4.3.5. Guardamos solo los que sí hicieron match (solo los que coincidieron y cumplen con la lógica extra)
+  desparecidos_nombre_match <- desparecidos_nombre_match_pre |> 
+  filter(tipo_match == "match_nombre") 
+  
+
+  # ----------------------------------------------------
+  # 5. Bases consolidadas
+  # ----------------------------------------------------
+  
+   # 5.1. Agregamos los que NO matchearon a la base final de "Sin Match"
+  base_final_sin_match <- base_final_sin_match |>
+  bind_rows(
+    desparecidos_nombre_match_pre |>
+      filter(is.na(tipo_match)) 
+  )
+  
+  # 5.2. Eliminamos columnas innecesarias
+  base_final_sin_match <- base_final_sin_match |> 
+    select(-c(fub_rnpdno:clasificacion_des_rnpdno)) |> 
+    mutate(indicadora_rnpdno = NA_character_)
+  
+  cat("El número de personas desaparecidas con registro en BANCI pero no en RNPDNO, que tienen identidad válida son: ", comma(nrow(base_final_sin_match)), "\n")
+  
+  # 5.2 Añadir los casos sin idéntidad válida a base_final_sin_match
+  # Partimos de la base "subeR_no_localizados_sin_identidad_valida"
+  
+  base_final_sin_match_final <- base_final_sin_match |> 
+    bind_rows(subeR_no_localizados_sin_identidad_valida)
+  
+  numero_base_final_sin_match_final <- base_final_sin_match_final |> 
+    nrow()
+  
+  cat("La cantidad de personas desaparecidas, con identidad válida e inválida, que están en BANCI pero no en RNPDNO es de:", comma(numero_base_final_sin_match_final), "registros",
+      "\n")
+
+  # ---- Base con matches ----
+  base_datos_encontrados <- bind_rows(
+  desparecidos_fub_match,
+  desparecidos_curp_match,
+  desparecidos_nombre_match)
+  
+  # Eliminar repetidos con fub del RNPDNO
+  base_datos_encontrados <- base_datos_encontrados |> 
+    group_by(fub_rnpdno) |> 
+    filter(row_number() == 1 | is.na(fub_rnpdno)) |> 
+    ungroup()
+  
+  numero_base_datos_encontrados <- base_datos_encontrados |>
+    nrow()
+  
+  cat("En total tenemos", comma(numero_base_datos_encontrados), "registros en BANCI y RNPDNO (intersección)\n")
+  
+  # Paso final: crear una lista con los insumos generados
+  lista_con_insumos = list(
+    Base_BANCI_sin_match_con_RNPDNO = base_final_sin_match_final,
+    Base_BANCI_con_match_con_RNPDNO = base_datos_encontrados
+  )
+}
+
+# Llamar a la función
+lista_con_insumos <- funcion_de_match_BANCI_y_RNPDNO(
+  subeR = subeR, 
+  comprimido = comprimido)
+
+```
+# Guardar la base con la intersección y la base de solo BANCI
+
+\textbf{Nota:} El siguiente bloque de código solo debe correrse en caso de que se actualice el \textit{matching} entre la BANCI y el RNPDNP.
+
+```{r eval = FALSE}
+# Definimos objetos de base sin match (base_final_sin_match) y base con match (base_datos_encontrados)
+Base_BANCI_sin_match_con_RNPDNO <- lista_con_insumos["Base_BANCI_sin_match_con_RNPDNO"] |> 
+  map_dfr(.f = identity)
+
+Base_BANCI_con_match_con_RNPDNO <- lista_con_insumos["Base_BANCI_con_match_con_RNPDNO"] |> 
+  map_dfr(.f = identity)
+
+# Guardar cruces Base_BANCI_sin_match_con_RNPDNO y Base_BANCI_con_match_con_RNPDNO
+fecha_actual <- today()
+
+string_fecha <- paste0(
+    substr(fecha_actual, 9, 10),
+    substr(fecha_actual, 6, 7),
+    substr(fecha_actual, 1, 4)
+  ) 
+
+# Crear carpeta si no existe
+carpeta <- here::here("RNPDNO",
+                            "output",
+                            "cruces_banci_rnpdno",
+                            paste0("cruces_banci_rnpdno_",string_fecha))
+
+if (!dir.exists(carpeta)) {
+  if (dir.create(carpeta , recursive = TRUE)) {
+    cat("Carpeta creada: ", carpeta)
+  } else {
+    cat("No se pudo crear carpeta: ", carpeta)
+  }
+} else{
+  cat("La carpeta ", carpeta, " ya existe.")
+}
+
+save(Base_BANCI_sin_match_con_RNPDNO , file = paste0(carpeta,"/Base_BANCI_sin_match_con_RNPDNO.RData"))
+
+save(Base_BANCI_con_match_con_RNPDNO , file = paste0(carpeta, "/Base_BANCI_con_match_con_RNPDNO.RData"))
+```
+
+
+
+# Función para generar base de RNPDNO (con intersección entre BANCI y RNPDNO) + base de la BANCI
+
+```{r eval = FALSE}
+# Delimitamos fecha de corte de desaparición del RNPDNO
+# fecha_de_desaparicion_rnpndo <- "2006-02-13"
+
+funcion_creacion_bases_rndpno <- function(Base_BANCI_sin_match_con_RNPDNO, Base_BANCI_con_match_con_RNPDNO) {
+  
+  # ----------------------------------------------------
+  # 1. Crear base de RNPDNO con intersección con BANCI
+  
+  # Sustituimos los datos encontrados en la intersección (base_datos_encontrados) dentro de los registros del RNPDNO. De tal manera que nos quedemos con las variables, referentes a la desaparición, del RNPDNO
+  
+  # ----------------------------------------------------
+  
+  # 1. Partimos de los no localizados del RNPDNO
+  # comprimido_no_localizados
+  
+  # 1.1. Pegamos datos de la intersección entre RNPDNO y BANCI con registros administrativos
+  Base_BANCI_con_match_con_RNPDNO_con_indicios <- Base_BANCI_con_match_con_RNPDNO |> 
+  left_join(registros |> 
+              select(fub, indicadora_indicio_de_vida),
+            by = c("fub_rnpdno" = "fub"))
+  
+  Base_BANCI_con_match_con_RNPDNO_con_indicios <- Base_BANCI_con_match_con_RNPDNO_con_indicios |> 
+  mutate(indicadora_indicio_de_vida = case_when(
+    is.na(indicadora_indicio_de_vida) ~ "sin registro administrativo",
+    TRUE ~ indicadora_indicio_de_vida
+  ))
+
+  # 1.2. Sustituimos los datos en la intersección, entre BANCI y RNPDNO, en RNPDNO
+  comprimido_no_localizados_con_interseccion <- comprimido_no_localizados |> 
+  left_join(
+    Base_BANCI_con_match_con_RNPDNO_con_indicios |> 
+      mutate(expediente_banci = "carpeta de investigacion",
+             dependencia_de_origen_banci = "Fiscalía",
+             origen_categoria_union = "Intersección banci y rnpdno",
+             clasificacion_banci = case_when(
+               indicadora_curp_limpia_valida == "valida" & indicadora_indicio_de_vida == "sin registro administrativo" ~ "Desaparecidos con datos y sin registro administrativo",
+               indicadora_curp_limpia_valida == "invalida" & indicadora_indicio_de_vida == "sin registro administrativo" ~ "Sin datos",
+               indicadora_indicio_de_vida == "con registro administrativo" ~ "Desaparecidos con conincidencia con registro administrativo",
+               
+               TRUE ~ "Sin clasificación (revisar)")) |> 
+      select(fub = fub_rnpdno,
+             clasificacion_des_rnpdno,
+             tipo_match,
+             expediente_banci,
+             dependencia_de_origen_banci,
+             origen_categoria_union,
+             clasificacion_banci
+             ),
+    by = "fub"
+  )
+  
+  if (comprimido_no_localizados_con_interseccion |> group_by(fub) |>
+      filter(n() > 1) |> nrow() == 0) {
+    cat("Hay 0 fubs repetidos en la base de RNPDNPO junto con la intersección entre BANCI y RNPDNO. ¡Esto es correcto! \n")
+  } else{
+    stop("Hay registros de fubs duplicados, ¡esto no debería pasar! Revisar de favor")
+  }
+  
+  # 1.3 Ver cuántos tipos de matches hubo con BANCI
+  n_curp   <- comprimido_no_localizados_con_interseccion |> filter(tipo_match == "match_curp") |> nrow()
+  n_fub    <- comprimido_no_localizados_con_interseccion |> filter(tipo_match == "match_fub") |> nrow()
+  n_nombre <- comprimido_no_localizados_con_interseccion |> filter(tipo_match == "match_nombre") |> nrow()
+  
+  # 1.4 Imprimimos usando cat (separando por comas los argumentos)
+  cat("Entre RNPDNO y BANCI hubo:\n",
+    "- ", n_curp, "matches con CURP\n",
+    "- ", n_fub, "matches con FUB\n",
+    "- ", n_nombre, "matches con nombre\n")
+  
+  # 1.5 Cuando tipo_match sea NA, marcar "sin match"
+  comprimido_no_localizados_con_interseccion <- comprimido_no_localizados_con_interseccion |> 
+  mutate(
+    tipo_match = case_when(
+      is.na(tipo_match) ~ "sin match",
+      TRUE ~ tipo_match
+    ),
+    dummy_interseccion_banci_rnpdno = case_when(
+      tipo_match == "sin match" ~ 0,
+      TRUE ~ 1
+    )
+  ) 
+  
+  # 1.6 Cambiar reclasificación de dependencia de origen y tipo de expediente
+  comprimido_no_localizados_con_interseccion <- 
+    comprimido_no_localizados_con_interseccion |> 
+    mutate(
+    dependencia_de_origen_banci = case_when(
+      !is.na(dependencia_de_origen_banci) ~ "Fiscalía con carpeta de investigación",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(
+    expediente_final = coalesce(expediente_banci, expediente_reclasif),
+    dependencia_origen_final = coalesce(dependencia_de_origen_banci,
+                                        dependencia_origen_reclasificado),
+    dependencia_de_origen_final = coalesce(dependencia_de_origen_banci,
+                                           dependencia_origen_reclasificado),
+    clasificacion_final = case_when(clasificacion_des %in% "Pendientes" &
+                                      indicadora_indicio_de_vida == "sin registro administrativo"
+                                     ~ "Sin datos",
+                                    clasificacion_des %in% "Desaparecidos" |
+                                      (clasificacion_des %in% "Pendientes" & 
+                                         indicadora_indicio_de_vida == "con registro administrativo")
+                                      ~ "Con datos",
+                                    TRUE ~ "revisar clasificación, algo mal")
+  )
+  
+  if (any(comprimido_no_localizados_con_interseccion$clasificacion_final != "revisar clasificación, algo mal")) {
+    cat("No hay ningún registro que falte clasificar en 'con datos' o 'sin datos' de la base 'comprimido_no_localizados_con_interseccion'. ¡Esto es correcto!", "\n")
+  } else{
+    stop("Hay registros sin clasificación en el archivo 'comprimido_no_localizados_con_interseccion' de la variable 'clasificacion_final'. Esto es incorrecto, revisar de favor.")
+  }
+  
+  # 1.7 Crear clasificación de datos (sin datos, desaparecidos con curp y sin indicios, desaparecidos con registro admin)
+  comprimido_no_localizados_con_interseccion <-
+    comprimido_no_localizados_con_interseccion |> 
+    mutate(sub_clasificacion_final = case_when(
+      clasificacion_des %in% "Pendientes" &
+                                      indicadora_indicio_de_vida == "sin registro administrativo"
+                                     ~ "Sin datos",
+      indicadora_curp_valida == "valida" & indicadora_indicio_de_vida == "sin registro administrativo" ~ "Desaparecido sin coincidencia con registro administrativo",
+      indicadora_indicio_de_vida == "con registro administrativo" ~ "Desaparecido con registro administrativo",
+      TRUE ~ "revisar subclasificación, algo mal"
+    ))
+  
+  if (any(comprimido_no_localizados_con_interseccion$sub_clasificacion_final != "revisar subclasificación, algo mal")) {
+    cat("No hay ningún registro que falte clasificar en 'sin datos', 'Desaparecido sin coincidencia con registro administrativo' o 'Desaparecido con registro administrativo' de la base 'comprimido_no_localizados_con_interseccion'. ¡Esto es correcto!", "\n")
+  } else{
+    stop("Hay registros sin clasificación en el archivo 'comprimido_no_localizados_con_interseccion' de la variable 'sub_clasificacion_final'. Esto es incorrecto, revisar de favor.")
+  }
+  
+  # 1.8 Crear categoría de "Solo RNPNDO, sin intersección"
+  comprimido_no_localizados_con_interseccion <-
+    comprimido_no_localizados_con_interseccion |> 
+    mutate(origen_categoria_union = case_when(
+      is.na(origen_categoria_union) ~ "Solo RNPNDO, sin intersección",
+      TRUE ~ origen_categoria_union
+    ))
+
+
+  # ----------------------------------------------------
+  # 2. Cargar datos sin match entre RNPDNO y BANCI
+  # ----------------------------------------------------
+  
+  # 2.1 Partimos de la base sin match entre RNPDNO y BANCI
+  # Base_BANCI_sin_match_con_RNPDNO
+  
+  # 2.2 Añadimos variables nuevas necesarias para la base final (de la siguiente sección)
+  
+  # a. expediente
+  Base_BANCI_sin_match_con_RNPDNO$expediente <- "carpeta de investigacion"
+  
+  # b. dependencia de origen
+  Base_BANCI_sin_match_con_RNPDNO$dependencia_de_origen <- "Fiscalía con carpeta de investigación"
+  
+  # c. indicador de tipo de dato
+  Base_BANCI_sin_match_con_RNPDNO$origen_categoria_union <- "Solo banci, sin intersección"
+  
+  # d. reclasificacion de los registros administrativos
+  # No hay personas desaparecidas en solo BANCI de las que se hayan realizado confrontas
+  Base_BANCI_sin_match_con_RNPDNO <- Base_BANCI_sin_match_con_RNPDNO |> 
+  mutate(indicadora_indicio_de_vida = "sin registro administrativo")
+  
+  # e. clasificación de la persona desaparecida
+  # CONSIDERACIÓN IMPORTANTE: como se mencionó en la primera parte del script, la clasificación "con datos" es arbitraria. Para el caso de los registros de la BANCI se supone que al tener los datos de la carpeta de investigación es suficiente para rastrear el caso de desaparición. Es decir, no es necesario contar con una CURP válida para contar el registro como válido.
+  Base_BANCI_sin_match_con_RNPDNO <- Base_BANCI_sin_match_con_RNPDNO |> 
+  mutate(clasificacion = "Con datos",
+         sub_clasificacion = "Desaparecido sin coincidencia con registro administrativo")
+  
+  
+  # ----------------------------------------------------
+  # 3. Generar base consolidada de dos insumos: (RNPDNO solo + RNPDNP con BANCI) + Solo BANCI
+  # ----------------------------------------------------
+  
+  # 3. Generar consolidado
+  comprimido_consolidado <- comprimido_no_localizados_con_interseccion |> 
+  mutate(idmunicipio = as.character(idmunicipio)) |> 
+  select(fub, 
+         nombre_completo_victima,
+         nombre_vic,
+         primerapellido_vic,
+         segundoapellido_vic,
+         sexo,
+         fechanacimiento,
+         nacionalidad,
+         idestado_hechos = idestado,
+         idmunicipio_hechos = idmunicipio, ## HASTA AQUÍ NORMAL
+         clasificacion = clasificacion_final,
+         sub_clasificacion = sub_clasificacion_final,
+         origen_categoria_union,
+         dependencia_origen = dependencia_de_origen_final,
+         expediente = expediente_final,
+         indicadora_curp_valida,
+         clasificacion_des,
+         indicadora_indicio_de_vida,
+         fecha_hechos_consolidada = fecha_hechos_modificada,
+         anio_hechos_consolidada = anio_hechos_modificada,
+         dummy_interseccion_banci_rnpdno,
+         curp_victima) |> 
+  bind_rows(
+    Base_BANCI_sin_match_con_RNPDNO |> 
+      mutate(clasificacion_des = "Desaparecidos",
+             fha_nac = as.Date(fha_nac),
+             fha_de_hchos = as.Date(fha_de_hchos),
+             id_mun_hchos = as.character(id_mun_hchos)) |> 
+      select(
+        nombre_completo_victima,
+        nombre_vic = nombres,
+        primerapellido_vic = primer_apellido,
+        segundoapellido_vic = segundo_apellido,
+        sexo,
+        fechanacimiento = fha_nac,
+        nacionalidad = nacional,
+        clasificacion_des,
+        entidad_reporta,
+        idestado_hechos = id_ent_hchos,
+        idmunicipio_hechos = id_mun_hchos,
+        fecha_hechos_consolidada = fha_de_hchos, # HASTA AQUÍ SIN MODIFICACIONES
+        clasificacion, 
+        sub_clasificacion,
+        origen_categoria_union,
+        dependencia_origen = dependencia_de_origen,
+        expediente,
+        indicadora_curp_valida = indicadora_curp_limpia_valida,
+        curp_victima = curp
+      )
+  )
+  
+  # 3.2 Arreglar inconsistencias 
+  # Para el caso de personas desaparecidas con datos pero sin registro administrativo
+  # Es decir, para cuando sub_clasificacion == "Desaparecido sin coincidencia con registro administrativo", Ale Nuñez investigó y encontró que los casos donde la dependencia_origen == "SE DESCONOCE" en realidad se trata del "Portal"
+  comprimido_consolidado <- comprimido_consolidado |> 
+    mutate(
+      dependencia_origen = case_when(
+        sub_clasificacion == "Desaparecido sin coincidencia con registro administrativo" & 
+          anio_hechos_consolidada >= 2006 &
+          dependencia_origen == "SE DESCONOCE" ~ "Portal",
+        TRUE ~ dependencia_origen
+      )
+    )
+  
+  # 3.3 Completar 'dummy_interseccion_banci_rnpdno'
+  comprimido_consolidado <- comprimido_consolidado |> 
+  mutate(
+    dummy_interseccion_banci_rnpdno = case_when(
+      is.na(dummy_interseccion_banci_rnpdno) ~ 0,
+      TRUE ~ dummy_interseccion_banci_rnpdno
+    )
+  )
+  
+  # 3.4 Renombrar variable de entidad_reporta para hacer explícito que pertenece a BANCI
+  comprimido_consolidado <- comprimido_consolidado |> 
+  rename(entidad_reporta_banci = entidad_reporta)
+  
+  # 3.5 Definimos variable de año
+  comprimido_consolidado$anio_hechos_consolidada =
+    year(comprimido_consolidado$fecha_hechos_consolidada)
+  
+  # Definimos variable de mes
+  comprimido_consolidado$mes_hechos_consolidada =
+    month(comprimido_consolidado$fecha_hechos_consolidada)
+  
+  comprimido_consolidado <- comprimido_consolidado |> 
+    mutate(
+    anio_mes_hechos_consolidada = make_date(anio_hechos_consolidada, mes_hechos_consolidada, 1)
+    ) |> 
+    select(-mes_hechos_consolidada)
+  
+  # Pegar catálogo de entidades federativas
+  comprimido_consolidado <- comprimido_consolidado |>  
+    left_join(catalogo_estados, by =c("idestado_hechos" = "id_estado"))
+  
+  comprimido_consolidado <- comprimido_consolidado |> rename(estado_hechos = estado)
+  
+  comprimido_consolidado <- comprimido_consolidado |> mutate(estado_hechos = str_to_title(estado_hechos))
+  
+  # Para los casos de la BANCI, hay casos donde la entidad de los hechos de desaparición NO coincide con la entidad en la que se reporta la desaparición. Se prefiere el dato de la desaparición sobre el reporte.
+  comprimido_consolidado <- comprimido_consolidado |> 
+    mutate(
+      entidad_de_hecho_o_reporte = coalesce(estado_hechos, entidad_reporta_banci)
+    ) |> 
+    select(-c(estado_hechos, entidad_reporta_banci))
+  
+  return(comprimido_consolidado)
+}
+
+# NOTA: En caso de que ya se cuente con las bases "Base_BANCI_con_match_con_RNPDNO" y "Base_BANCI_sin_match_con_RNPDNO", se pueden cargar directamente y correr la función para generar la base consolidada
+# Bajamos los archivos 'Base_BANCI_sin_match_con_RNPDNO' y 'Base_BANCI_con_match_con_RNPDNO' que ya estén listo
+archivos <- c("Base_BANCI_con_match_con_RNPDNO.RData",
+              "Base_BANCI_sin_match_con_RNPDNO.RData")
+
+lapply(here::here("RNPDNO",
+                       "output",
+                  "cruces_banci_rnpdno",
+                       "cruces_banci_rnpdno_13032026",
+                       archivos), load ,
+       .GlobalEnv)
+
+Base_BANCI_sin_match_con_RNPDNO$id_ent_hchos <- as.numeric(Base_BANCI_sin_match_con_RNPDNO$id_ent_hchos)
+
+# Corremos función
+comprimido_consolidado <- funcion_creacion_bases_rndpno(
+  Base_BANCI_sin_match_con_RNPDNO = Base_BANCI_sin_match_con_RNPDNO,
+  Base_BANCI_con_match_con_RNPDNO = Base_BANCI_con_match_con_RNPDNO
+)
+```
+
+## Guardar a desaparecidos con datos desde 2006 para cruzarlo con PUI
+```{r}
+# Descargar datos
+sin_banci <- comprimido_consolidado |> 
+  filter(!origen_categoria_union %in% "Solo banci, sin intersección")
+
+# Contar la cantidad de registros sin curp pero con indicios de vida
+sin_banci |> filter(indicadora_curp_valida == "invalida" & indicadora_indicio_de_vida == "con registro administrativo") |> 
+  nrow()
+
+con_datos <- sin_banci |> 
+  filter(indicadora_curp_valida == "valida")
+
+# Guardamos
+writexl::write_xlsx(
+  con_datos,
+  here::here("RNPDNO",
+             "output",
+             "resultados_independientes",
+             "con_datos_23022026.xlsx"))
+
+
+# Guardamos
+writexl::write_xlsx(
+  Base_BANCI_sin_match_con_RNPDNO_CDMX ,
+  here::here("RNPDNO",
+             "output",
+             "resultados_independientes",
+             "Base_BANCI_sin_match_con_RNPDNO_CDMX.xlsx"))
+
+```
+# PPTx de consumo interno (Desagregación de datos mensuales y anuales de personas desaparecidas)
+```{r}
+
+localizados_anuales_con_anio_localiza <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados",
+         anio_loc_imputada >= 2019) |> 
+  group_by(anio_loc_imputada) |> 
+  count()
+
+names(localizados_anuales_con_anio_localiza) <- c("Año",
+                        "Localizados del periodo")
+
+# --------------------------------------------------------- #
+# Slide de tendencia de reportes y registros (2019-2026) -----
+# --------------------------------------------------------- #
+
+# Localizados anuales
+localizados_anuales <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados",
+         anio_hechos_modificada >= 2019) |> 
+  group_by(anio_hechos_modificada) |> 
+  count()
+
+names(localizados_anuales) <- c("Año",
+                        "Desaparecidos que fueron localizados del periodo")
+
+# Nueva clasificación desde 2019
+comprimido_consolidado_2019 <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2019) |> 
+  count(anio_hechos_consolidada, sub_clasificacion)
+
+# Hacerlo wider
+comprimido_consolidado_2019 <-
+  comprimido_consolidado_2019 |> 
+  pivot_wider(
+    names_from = sub_clasificacion,
+    values_from = n,
+    values_fill = 0
+  )
+
+# Pegar con "localizados_anuales" que tiene información de los desaparecidos que fueron localizados del periodo
+comprimido_consolidado_2019 <- comprimido_consolidado_2019 |> 
+  left_join(localizados_anuales, by = c("anio_hechos_consolidada" = "Año"))
+
+# Guardar
+writexl::write_xlsx(
+  comprimido_consolidado_2019,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_comprimido_consolidado_anua_con_desaparecidos_localizados_del_periodo_2019_13032026.xlsx"))
+
+# --------------------------------------------------------- #
+# Gráfica de porcentajes -----
+# --------------------------------------------------------- #
+
+# Gráfica con datos mensuales desde octubre 2024
+
+# Nueva clasificación desde 2019
+comprimido_consolidado_oct2024 <- comprimido_consolidado |> 
+  filter(anio_mes_hechos_consolidada >= "2024-10-01") |> 
+  count(anio_mes_hechos_consolidada, expediente)
+
+# Hacerlo wider
+comprimido_consolidado_oct2024 <-
+  comprimido_consolidado_oct2024 |> 
+  pivot_wider(
+    names_from = expediente,
+    values_from = n,
+    values_fill = 0
+  )
+
+# Añadir variables de porcentaje
+comprimido_consolidado_oct2024 <- comprimido_consolidado_oct2024 |> 
+  mutate(
+    total = `carpeta de investigacion` + `expediente genérico`,
+    porcen_expediente = round((`expediente genérico` * 100)/total , 1),
+    porcen_carpeta = round((`carpeta de investigacion` * 100)/total , 1)
+  )
+
+comprimido_consolidado_oct2024 <- comprimido_consolidado_oct2024 |> 
+  select(anio_mes_hechos_consolidada,
+  porcen_expediente, porcen_carpeta)
+
+names(comprimido_consolidado_oct2024) <- c("Año y mes",
+"Sin carpeta", "Con carpeta")
+
+# Guardar
+writexl::write_xlsx(
+  comprimido_consolidado_oct2024,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_03022026",
+             "tabulado_con_y_sin_ci_mensual_oct2024_03022026.xlsx"))
+
+# Gráfica con datos anuales desde 2006
+
+# Nueva clasificación desde 2006
+comprimido_consolidado_2006 <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006) |> 
+  count(anio_hechos_consolidada, expediente)
+
+# Hacerlo wider
+comprimido_consolidado_2006 <-
+  comprimido_consolidado_2006 |> 
+  pivot_wider(
+    names_from = expediente,
+    values_from = n,
+    values_fill = 0
+  )
+
+# Añadir variables de porcentaje
+comprimido_consolidado_2006 <- comprimido_consolidado_2006 |> 
+  mutate(
+    total = `carpeta de investigacion` + `expediente genérico`,
+    porcen_expediente = round((`expediente genérico` * 100)/total , 1),
+    porcen_carpeta = round((`carpeta de investigacion` * 100)/total , 1)
+  )
+
+comprimido_consolidado_2006 <- comprimido_consolidado_2006 |> 
+  select(anio_hechos_consolidada,
+  porcen_expediente, porcen_carpeta)
+
+names(comprimido_consolidado_2006) <- c("Año y mes",
+"Sin carpeta", "Con carpeta")
+
+# Guardar
+writexl::write_xlsx(
+  comprimido_consolidado_2006,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabulado_con_y_sin_ci_anual_2006_13032026.xlsx"))
+
+# Nuevo pedido (10-03-2026): desglosar por dependencia de origen
+
+# Nueva clasificación desde 2006
+comprimido_consolidado_2006_por_dependencia <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006) |> 
+  count(anio_hechos_consolidada, expediente, dependencia_origen)
+
+# Hacerlo wider
+comprimido_consolidado_2006_por_dependencia <-
+  comprimido_consolidado_2006_por_dependencia |> 
+  pivot_wider(
+    names_from = expediente,
+    values_from = n,
+    values_fill = 0
+  )
+
+# Hacer conteo de carpeta de investigación por dependencia de origen
+
+## Por fiscalía
+comprimido_consolidado_2006_por_dependencia |> 
+  filter(dependencia_origen == "Fiscalía con carpeta de investigación" |
+  dependencia_origen == "Fiscalía con expediente genérico") |> 
+  summarise(total_carpeta_fiscalia = sum(`carpeta de investigacion`)) # 10,884
+
+
+## Por comisiones
+comprimido_consolidado_2006_por_dependencia |> 
+  filter(dependencia_origen == "Comisión Nacional de búsqueda de personas" |
+  dependencia_origen == "Comisión local de búsqueda de personas") |> 
+  summarise(total_carpeta_fiscalia = sum(`carpeta de investigacion`)) # 601
+
+## Por portales
+comprimido_consolidado_2006_por_dependencia |> 
+  filter(dependencia_origen == "Portal") |> 
+  summarise(total_carpeta_fiscalia = sum(`carpeta de investigacion`)) # 31
+
+## Por se desconoce
+comprimido_consolidado_2006_por_dependencia |> 
+  filter(dependencia_origen == "SE DESCONOCE") |> 
+  summarise(total_carpeta_fiscalia = sum(`carpeta de investigacion`)) # 0
+
+# Buscar a las fiscalías que no están cumpliendo en poner carpetas de investigación
+comprimido_consolidado_2026 <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2026) |> 
+  filter(expediente != "carpeta de investigacion") 
+
+# Verificar que no haya datos de banci
+comprimido_consolidado_2026 |> 
+  count(origen_categoria_union)
+
+# Pegar con la fiscalía exacta del dato
+comprimido_consolidado_2026 <- comprimido_consolidado_2026 |> 
+  left_join(
+    comprimido |> 
+      select(fub, dependencia_origen_fiscalia = dependencia_origen, expediente),
+    by = "fub"
+  )
+
+# Seleccionar variablaes importantes
+comprimido_consolidado_2026 <- comprimido_consolidado_2026 |> 
+  select(tipo_dependencia_origen = dependencia_origen, 
+  nombre_dependencia_origen = dependencia_origen_fiscalia,
+  expediente_nombre = expediente.y,
+  entidad_desaparicion = entidad_de_hecho_o_reporte,
+  fub,
+  curp_victima,
+  nombre_completo_victima,
+  nombre_vic,
+  primerapellido_vic,
+  segundoapellido_vic,
+  sexo,
+  fechanacimiento,
+  nacionalidad,
+  fecha_desaparicion = fecha_hechos_consolidada
+  )
+
+comprimido_consolidado_2026 |> count(entidad_desaparicion)
+
+# Guardar
+writexl::write_xlsx(
+  comprimido_consolidado_2026,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_desaparecidos_sin_carpeta_investigacion_2026_13032026.xlsx"))
+
+```
+# Personas desaparecidas con datos que NO tienen coincidencias administrativas
+
+```{r eval = FALSE}
+# ----------------------------------------------------
+# Hacemos el corte de la base de datos
+# ----------------------------------------------------
+comprimido_con_datos_sin_registro <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006,
+         sub_clasificacion == "Desaparecido sin coincidencia con registro administrativo")
+
+# ----------------------------------------------------------------------------- #
+
+num_comprimido_con_datos_sin_registro <- comprimido_con_datos_sin_registro |> 
+  nrow()
+
+cat("El número de personas con datos que no tienen coincidencias administrativas es de:",
+    comma(num_comprimido_con_datos_sin_registro))
+  
+# ----------------------------------------------------
+# Origen del reporte de la desaparición
+# ----------------------------------------------------
+comprimido_con_datos_sin_registro |> count(dependencia_origen)
+
+# Calcular porcentajes
+resultados_finales <- comprimido_con_datos_sin_registro |> 
+  count(dependencia_origen) |> 
+  mutate(grupo_general = case_when(
+    grepl("Fiscalía", dependencia_origen) ~ "Fiscalía",
+    grepl("Comisión", dependencia_origen) ~ "Comisión",
+    TRUE ~ "Portal"
+  )) |> 
+  # Calculamos el total de la base para el global
+  mutate(total_base = sum(n)) |> 
+  # Agrupamos por el bloque grande (Fiscalía, Comisión, etc.)
+  group_by(grupo_general) |> 
+  mutate(
+    n_grupo = sum(n),                     # Total de ese grupo
+    pct_global = n_grupo / total_base,    # % del grupo vs total de la base
+    pct_interno = n / n_grupo             # % de la subcategoría vs su grupo
+  ) |> 
+  ungroup() |> 
+  # 3. Dar formato y limpiar
+  select(grupo_general, dependencia_origen, n, pct_global, pct_interno) |> 
+  mutate(
+    pct_global = label_percent(accuracy = 0.1)(pct_global),
+    pct_interno = label_percent(accuracy = 0.01)(pct_interno)
+  )
+
+# Cambiemos el formato a uno wider
+# Eliminemos columnas de porcentajes
+resultados_finales <- resultados_finales |> 
+  select(-c(pct_global, pct_interno)) |> 
+  pivot_wider(
+    id_cols = grupo_general,                   # conserva explícitamente el grupo
+    names_from = dependencia_origen,
+    values_from = n,
+    values_fill = 0,
+    values_fn = sum   
+  )
+
+openxlsx::write.xlsx(resultados_finales,
+             here::here("RNPDNO",
+                        "output",
+                        "PPT",
+                        "datos_actualizacion_ppt",
+                        "estadisticos_13032026",
+                        "tabla_origen_reporte_desaparecidos_con_datos_sin_coincidencia_administrativa_13032026.xlsx"))
+
+## Hagamos el mismo ejercicio pero considerando una sub-clasificación extra: "expediente" que puede ser "carpeta de investigación" o "expediente genérico"
+resultados_por_expediente <- comprimido_con_datos_sin_registro |>
+  count(expediente, dependencia_origen, name = "n") |>
+  mutate(
+    grupo_general = case_when(
+      grepl("Fiscalía", dependencia_origen) ~ "Fiscalía",
+      grepl("Comisión", dependencia_origen) ~ "Comisión",
+      TRUE ~ "Portal"
+    ),
+    dependencia_origen_con_expediente = paste0(dependencia_origen, " - ", expediente)
+  ) |>
+  group_by(expediente, grupo_general, dependencia_origen, dependencia_origen_con_expediente) |>
+  summarise(n = sum(n), .groups = "drop") |>   # asegura unicidad por combinación
+  pivot_wider(
+    id_cols = grupo_general,                   # conserva explícitamente el grupo
+    names_from = dependencia_origen_con_expediente,
+    values_from = n,
+    values_fill = 0,
+    values_fn = sum                            # en caso de valores repetidos, sumar
+  )
+
+openxlsx::write.xlsx(resultados_por_expediente,
+             here::here("RNPDNO",
+                        "output",
+                        "PPT",
+                        "datos_actualizacion_ppt",
+                        "estadisticos_13022026",
+                        "tabla_origen_reporte_desaparecidos_con_datos_sin_coincidencia_administrativa_por_expediente_13022026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Columna de desaparecidos que fueron localizados del periodo -----
+# Localizados con fecha de localizado correspondiente a la fecha de su desaparición
+# ---------------------------------------------------------------------------- #
+
+# Localizados históricos
+numero_localizados_historicos <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados") |> 
+  group_by(anio_hechos_modificada) |> 
+  nrow()
+
+cat("El número de desaparecidos que fueron localizados históricos es:", comma(numero_localizados_historicos))
+
+# Localizados anuales
+localizados_anuales <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados",
+         anio_hechos_modificada >= 2006) |> 
+  group_by(anio_hechos_modificada) |> 
+  count()
+
+names(localizados_anuales) <- c("Año",
+                        "Desaparecidos que fueron localizados del periodo")
+
+
+# Localizados mensuales con corte desde 2024-10-01
+localizados_mensuales <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados",
+         anio_mes_hechos_modificada >= "2024-10-01") |> 
+  group_by(anio_mes_hechos_modificada) |> 
+  count()
+
+names(localizados_mensuales) <- c("Año y mes",
+                        "Desaparecidos que fueron localizados del periodo")
+
+# ---------------------------------------------------------------------------- #
+# Primera gráfica: localizados solo de fiscalías + casos en fiscalías (desglosado por "con carpeta de investigación" y "con registro administrativo")
+# ---------------------------------------------------------------------------- #
+
+tabla_clasificacion_comprimido_fiscalias <- comprimido_con_datos_sin_registro |> 
+  filter(dependencia_origen %in% c("Fiscalía con expediente genérico",
+                                   "Fiscalía con carpeta de investigación")) |> 
+  count(anio_hechos_consolidada,
+        dependencia_origen) |> 
+  filter(anio_hechos_consolidada >= 2006)
+
+tabla_clasificacion_comprimido_fiscalias <- tabla_clasificacion_comprimido_fiscalias |> 
+  pivot_wider(names_from = dependencia_origen,
+              values_from = n,
+              values_fill = 0)
+
+# Pegar columna con "localizados"
+localizados_fiscalías <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados",
+         indicadora_dependencia == "FISCALIA")
+
+cat("Total de localizados, vinculados con fiscalías, en el histórico:", 
+    comma(localizados_fiscalías |> nrow()))
+
+tabla_localizados_fiscalías <- localizados_fiscalías |> 
+  # 1. Filtramos el rango de interés
+  filter(anio_hechos_modificada >= 2006) |> 
+  
+  # 2. Contamos los registros por año
+  count(anio_hechos_modificada) |> 
+  
+  # 3. Completamos la secuencia de años del 2006 al 2025
+  # El argumento 'fill' indica con qué valor rellenar los años que no existían (n = 0)
+  complete(
+    anio_hechos_modificada = 2006:2026, 
+    fill = list(n = 0)
+  ) |> 
+  
+  # 4. Ordenamos para que se vea bien
+  arrange(anio_hechos_modificada)
+
+# Pegamos ambas tablas
+tabla_clasificacion_comprimido_fiscalias <- tabla_clasificacion_comprimido_fiscalias |> 
+  left_join(tabla_localizados_fiscalías,
+            by = c("anio_hechos_consolidada" = "anio_hechos_modificada"))
+
+names(tabla_clasificacion_comprimido_fiscalias) <- c("Año",
+                                                     "Fiscalía con carpeta de investigación",
+                                                     "Fiscalía con reporte",
+                                                     "Localizados vinculados a fiscalías")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_fiscalias,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_fiscalias_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Segunda gráfica: Tendencias de reportes y registros octubre 2024 - enero 2026 (personas desaparecidas que fueron localizadas + desaparecidos con registro administrativo + desaparecidos sin indicios + sin datos)
+# ---------------------------------------------------------------------------- #
+
+# Creamos corte de fechas
+comprimido_consolidado_con_corte <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006)
+
+# Hacemos tabulado
+tabla_comprimido_consolidado_con_corte <- comprimido_consolidado_con_corte |> 
+  filter(anio_mes_hechos_consolidada >= "2024-10-01") |> 
+  count(anio_mes_hechos_consolidada, sub_clasificacion) 
+
+# Hacerlo wider
+tabla_comprimido_consolidado_con_corte <-
+  tabla_comprimido_consolidado_con_corte |> 
+  pivot_wider(
+    names_from = sub_clasificacion,
+    values_from = n,
+    values_fill = 0
+  )
+
+tabla_comprimido_consolidado_con_corte <-
+  tabla_comprimido_consolidado_con_corte |> 
+  rename(`Año y mes` = anio_mes_hechos_consolidada)
+
+# Pegamos con desaparecidos que fueron localizados por mes
+tabla_comprimido_consolidado_con_corte <-
+  tabla_comprimido_consolidado_con_corte |> 
+  left_join(localizados_mensuales,
+            by = "Año y mes")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_comprimido_consolidado_con_corte,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_comprimido_reclasificado_por_mes_con_corte_oct2024_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Tercera gráfica: Tendencia de reportes y registros 2006-2025 (personas desaparecidas que fueron localizadas + desaparecidos con registro administrativo + desaparecidos sin indicios + sin datos)
+# ---------------------------------------------------------------------------- #
+
+# Partimos de comprimido_consolidado_con_corte
+# comprimido_consolidado_con_corte
+
+# Hacemos tabulado
+tabla_comprimido_consolidado_con_corte_por_anio <- comprimido_consolidado_con_corte |> 
+  filter(anio_hechos_consolidada >= 2006) |> 
+  count(anio_hechos_consolidada, sub_clasificacion) 
+
+# Hacerlo wider
+tabla_comprimido_consolidado_con_corte_por_anio <-
+  tabla_comprimido_consolidado_con_corte_por_anio |> 
+  pivot_wider(
+    names_from = sub_clasificacion,
+    values_from = n,
+    values_fill = 0
+  )
+
+tabla_comprimido_consolidado_con_corte_por_anio <-
+  tabla_comprimido_consolidado_con_corte_por_anio |> 
+  rename(Año = anio_hechos_consolidada)
+
+# Pegamos con desaparecidos que fueron localizados por año
+tabla_comprimido_consolidado_con_corte_por_anio <-
+  tabla_comprimido_consolidado_con_corte_por_anio |> 
+  left_join(localizados_anuales,
+            by = "Año")
+
+cat("El número de personas desaparecidas que fueron localizadas del periodo 2006-2025 es de:",
+    comma(sum(tabla_comprimido_consolidado_con_corte_por_anio$`Desaparecidos que fueron localizados del periodo`)), "\n")
+
+cat("El número de personas con coincidencias de vida es de:",
+    comma(sum(tabla_comprimido_consolidado_con_corte_por_anio$`Desaparecido con registro administrativo`)), "\n")
+
+cat("El número de personas sin indicios de vida es de:",
+    comma(sum(tabla_comprimido_consolidado_con_corte_por_anio$`Desaparecido sin coincidencia con registro administrativo`)), "\n")
+
+cat("El número de personas sin datos es de:",
+    comma(sum(tabla_comprimido_consolidado_con_corte_por_anio$`Desaparecido sin coincidencia con registro administrativo`)), "\n")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_comprimido_consolidado_con_corte_por_anio,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_comprimido_consolidado_con_corte_por_anio_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Cuarta gráfica: Tendencias de reportes y registros 2006 - 2025 Únicamente casos reportados por fiscalías (personas localizadas asociadas con fiscalías + desaparecidos con registro administrativo + desaparecidos de casos sin indicios con ci + desaparecidos de casos sin indicios con reporte de fiscalía)
+# ---------------------------------------------------------------------------- #
+
+# Uniremos dos bases distintas
+
+# Partimos de la base tabla_clasificacion_comprimido_fiscalias, la cual tiene los datos de personas sin registros administrativos
+# tabla_clasificacion_comprimido_fiscalias
+
+# Después creamos subconjunto de datos con registro administrativo asociado a fiscalías
+comprimido_con_registros_fiscalia <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006,
+         sub_clasificacion == "Desaparecido con registro administrativo",
+         dependencia_origen %in% c("Fiscalía con carpeta de investigación",
+                                   "Fiscalía con expediente genérico"))
+
+# Hacemos tabulado anuales
+tabla_comprimido_con_registros_fiscalia <- comprimido_con_registros_fiscalia |> 
+  count(anio_hechos_consolidada)
+
+names(tabla_comprimido_con_registros_fiscalia) <- c("Año",
+                                                    "Desaparecidos con registro administrativo - fiscalías")
+
+tabla_fiscalias_varios_datos <- tabla_clasificacion_comprimido_fiscalias |> 
+  left_join(tabla_comprimido_con_registros_fiscalia,
+            by = "Año") |> 
+  rename(
+    `Fiscalía con carpeta de investigación de casos sin indicios` = `Fiscalía con carpeta de investigación`,
+    `Fiscalía con reporte de casos sin indicios` = `Fiscalía con reporte`
+  )
+
+# Cambiamos NA por 0 en la nueva columna
+tabla_fiscalias_varios_datos <- tabla_fiscalias_varios_datos |> 
+  mutate(across(where(is.numeric), ~replace_na(.x , 0)))
+
+# Guardar
+writexl::write_xlsx(
+  tabla_fiscalias_varios_datos,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_fiscalias_con_ci_y_reporte_y_registros_con_indicios_y_localizados_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Quinta gráfica: Un subconjunto de tabla_fiscalias_varios_datos (2019 - 2025)
+# ---------------------------------------------------------------------------- #
+
+tabla_fiscalias_varios_datos_2019 <- tabla_fiscalias_varios_datos |> 
+  filter(Año >= 2019)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_fiscalias_varios_datos_2019,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_fiscalias_con_ci_y_reporte_y_registros_con_indicios_y_localizados_corte2019_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Sexta gráfica: Personas localizadas por año y quienes continúan desaparecidos con información de carpetas de investigación y reportes de las fiscalías.
+# ---------------------------------------------------------------------------- #
+
+# Unimos dos bases de datos
+
+# 1. tabla_clasificacion_comprimido_fiscalias
+
+# 2. localizados_anuales (localizados contabilizados con la fecha de desaparición)
+
+# 3. Deseleccionamos la variable de localizados vinculados a fiscalías y unimos ambas bases
+tabla_localizados_generales_y_fiscalias_sin_indicios <- tabla_clasificacion_comprimido_fiscalias |> 
+  select(-`Localizados vinculados a fiscalías`) |> 
+  left_join(localizados_anuales, 
+            by = "Año")
+
+# 4. Renombramos
+tabla_localizados_generales_y_fiscalias_sin_indicios <- tabla_localizados_generales_y_fiscalias_sin_indicios |> 
+  rename(`Fiscalía con carpeta de investigación de casos sin indicios` = `Fiscalía con carpeta de investigación`,
+    `Fiscalía con reporte de casos sin indicios` = `Fiscalía con reporte`)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_localizados_generales_y_fiscalias_sin_indicios,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_localizados_generales_y_fiscalias_sin_indicios_corte2006_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Séptima gráfica: un subconjunto de la anterior - con corte al 2019 - CAMBIO: localizados son vinculados a fiscalías
+# ---------------------------------------------------------------------------- #
+
+tabla_localizados_generales_y_fiscalias_sin_indicios_2019 <-
+  tabla_localizados_generales_y_fiscalias_sin_indicios |> 
+  filter(Año >= 2019)
+
+tabla_localizados_generales_y_fiscalias_sin_indicios_2019 <- tabla_localizados_generales_y_fiscalias_sin_indicios_2019 |> 
+  select(-`Desaparecidos que fueron localizados del periodo`) |>
+  left_join(
+    tabla_localizados_fiscalías |> rename(Año = anio_hechos_modificada),
+    by = "Año"
+  ) 
+
+tabla_localizados_generales_y_fiscalias_sin_indicios_2019 <- tabla_localizados_generales_y_fiscalias_sin_indicios_2019 |> 
+  rename("Localizados vinculados a fiscalías" = n)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_localizados_generales_y_fiscalias_sin_indicios_2019,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_localizados_generales_y_fiscalias_sin_indicios_corte2019_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Octaba gráfica: Personas localizadas por año y quienes continúan desaparecidos con información de carpetas de investigación, reportes de las fiscalías, comisión nacional, comisión local y portal público
+# ---------------------------------------------------------------------------- #
+
+# Tomamos en cuenta a todas las dependencias
+tabla_clasificacion_comprimido_dependencias <- comprimido_con_datos_sin_registro |> 
+  count(anio_hechos_consolidada,
+        dependencia_origen) |> 
+  filter(anio_hechos_consolidada >= 2006)
+
+tabla_clasificacion_comprimido_dependencias <- tabla_clasificacion_comprimido_dependencias |> 
+  pivot_wider(names_from = dependencia_origen,
+              values_from = n,
+              values_fill = 0)
+
+# Renombramos
+tabla_clasificacion_comprimido_dependencias <- 
+  tabla_clasificacion_comprimido_dependencias |> 
+  rename(`Fiscalía con carpeta de investigación` = `Fiscalía con carpeta de investigación`,
+    `Fiscalía con reporte` = `Fiscalía con expediente genérico`,
+    Año = anio_hechos_consolidada)
+
+# Pegamos con localizados anuales (contabilizados mediante su fecha de desaparición)
+tabla_clasificacion_comprimido_dependencias <- 
+  tabla_clasificacion_comprimido_dependencias |> 
+  left_join(localizados_anuales, 
+            by = "Año")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_dependencias,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_dependencias_con_localizados_corte2006_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Novena gráfica: Subconjunto de la anterior - corte 2019
+# ---------------------------------------------------------------------------- #
+
+tabla_clasificacion_comprimido_dependencias_2019 <- tabla_clasificacion_comprimido_dependencias |> 
+  filter(Año >= 2019)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_dependencias_2019,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_dependencias_con_localizados_corte2019_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Décima gráfica: Personas localizadas vinculadas a fiscalías y quienes continúan desaparecidos con información de carpetas de investigación, reportes de las fiscalías, comisión nacional, comisión local y portal público -----
+# ---------------------------------------------------------------------------- #
+
+# 1. Partimos de la base tabla_clasificacion_comprimido_dependencias y tiramos la columna de desaparecidos localizados
+tabla_clasificacion_comprimido_dependencias_v2 <- tabla_clasificacion_comprimido_dependencias |> 
+  select(-`Desaparecidos que fueron localizados del periodo`)
+
+# 2. Unimos con los localizados asociados a fiscalías: tabla_localizados_fiscalías
+tabla_clasificacion_comprimido_dependencias_v2 <- tabla_clasificacion_comprimido_dependencias_v2 |> 
+  left_join(
+    tabla_localizados_fiscalías |> rename(Año = anio_hechos_modificada),
+    by = "Año"
+  ) |> 
+  rename("Localizados vinculados a fiscalías" = n)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_dependencias_v2,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_dependencias_con_localizados_asociados_a_fiscalias_corte2006_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Onceava gráfica: subconjunto de la décima gráfica - corte 2019 ----
+# ---------------------------------------------------------------------------- #
+
+tabla_clasificacion_comprimido_dependencias_v2_2019 <- tabla_clasificacion_comprimido_dependencias_v2 |> 
+  filter(Año >= 2019)
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_dependencias_v2_2019,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_dependencias_con_localizados_asociados_a_fiscalias_corte2019_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Doceava gráfica: localizados por año más registros con datos sin coincidencias administrativas asociadas a comisiones ----
+# ---------------------------------------------------------------------------- #
+
+# Filtramos a casos de comisiones
+tabla_clasificacion_comprimido_comisiones <- comprimido_con_datos_sin_registro |> 
+  filter(dependencia_origen %in% c("Comisión Nacional de búsqueda de personas",
+                                   "Comisión local de búsqueda de personas")) |> 
+  count(anio_hechos_consolidada,
+        dependencia_origen) |> 
+  filter(anio_hechos_consolidada >= 2006)
+
+tabla_clasificacion_comprimido_comisiones <- tabla_clasificacion_comprimido_comisiones |> 
+  pivot_wider(names_from = dependencia_origen,
+              values_from = n,
+              values_fill = 0) |> 
+  rename(Año = anio_hechos_consolidada)
+
+# Pegamos localizados anuales (contabilizados mediante su fecha de desaparición)
+tabla_clasificacion_comprimido_comisiones <- 
+  tabla_clasificacion_comprimido_comisiones |> 
+  left_join(localizados_anuales, 
+            by = "Año")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_comisiones,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_comisiones_corte2006_13032026.xlsx"))
+
+# ---------------------------------------------------------------------------- #
+# Decimotercera gráfica: localizados por año más registros con datos sin coincidencias administrativas asociadas al Portal ----
+# ---------------------------------------------------------------------------- #
+
+# Filtramos a casos del Portal
+tabla_clasificacion_comprimido_portal <- comprimido_con_datos_sin_registro |> 
+  filter(dependencia_origen %in% c("Portal")) |> 
+  count(anio_hechos_consolidada,
+        dependencia_origen) |> 
+  filter(anio_hechos_consolidada >= 2006)
+
+# Añadimos todos los datos de 2000:2006
+tabla_clasificacion_comprimido_portal <- tabla_clasificacion_comprimido_portal |> 
+  complete(
+    anio_hechos_consolidada = 2006:2026,
+    dependencia_origen = "Portal",
+    fill = list(n = 0)
+  )
+
+tabla_clasificacion_comprimido_portal <- tabla_clasificacion_comprimido_portal |> 
+  pivot_wider(names_from = dependencia_origen,
+              values_from = n,
+              values_fill = 0) |> 
+  rename(Año = anio_hechos_consolidada)
+
+# Pegamos localizados anuales (contabilizados mediante su fecha de desaparición)
+tabla_clasificacion_comprimido_portal <- 
+  tabla_clasificacion_comprimido_portal |> 
+  left_join(localizados_anuales, 
+            by = "Año")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_portal,
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "datos_actualizacion_ppt",
+             "estadisticos_13032026",
+             "tabla_clasificacion_comprimido_portal_corte2006_13032026.xlsx"))
+```
+
+
+# Datos para completar árbol del RNPDNO 
+```{r eval = FALSE}
+# Definimos fecha de corte
+# fecha_corte <- today()
+fecha_corte <- today()
+
+# ----- Número de registros -----
+registros <- comprimido |> nrow()
+
+# ------ Desaparecidos ------
+desaparecidos_totales <- comprimido |> 
+  filter(!clasificacion_des %in% "Localizados") 
+
+numero_desaparecidos_totales <- desaparecidos_totales |> nrow()
+
+porcentaje_des <- (numero_desaparecidos_totales * 100/registros)
+
+## Corte especial desde 2006
+desaparecidos_corte <- desaparecidos_totales |> 
+  filter(fecha_hechos_modificada >= "2006-01-01") 
+
+numero_desaparecidos_corte <- desaparecidos_corte |> 
+  nrow()
+
+### Desaparecidos sin datos
+sin_datos <- desaparecidos_corte |> 
+  filter(clasificacion_des %in% "Pendientes" & indicadora_indicio_de_vida == "sin registro administrativo")
+
+numero_sin_datos <- sin_datos |> nrow()
+
+porcen_sin_datos <- round((numero_sin_datos * 100)/numero_desaparecidos_corte, 1)
+
+# --------------------------------------------------------- #
+# Temp 
+sin_curp <- desaparecidos_corte |> 
+  filter(clasificacion_des %in% "Pendientes") |> 
+  nrow()
+
+numero_sin_datos <- sin_datos |> nrow()
+
+# --------------------------------------------------------- #
+
+
+#### Datos faltantes de "sin datos"
+
+## Municipios
+dato_municipios <- sin_datos |> filter(is.na(idmunicipio)) |> nrow()
+
+## Fecha de nacimiento (fechanacimiento)
+dato_fecha_nacimiento <- sin_datos |> filter(is.na(fechanacimiento)) |> nrow()
+
+## Fecha de desaparición (fechahechos)
+dato_fecha_desaparicion <- sin_datos |> filter(is.na(fechahechos)) |> nrow()
+
+## Nombre (nombre_vic, primerapellido_vic y segundoapellido_vic)
+dato_nombre <- sin_datos |> filter(is.na(nombre_vic) | is.na(primerapellido_vic) |
+                                                      is.na(segundoapellido_vic)) |> nrow()
+
+## Sexo
+dato_sexo <- sin_datos |> filter(sexo %in% "INDETERMINADO" | is.na (sexo)) |> nrow()
+
+### Desaparecidos con datos
+con_datos <- desaparecidos_corte |> 
+  filter(!clasificacion_des %in% "Localizados") |> 
+  filter(indicadora_curp_valida == "valida" | 
+           indicadora_indicio_de_vida == "con registro administrativo") 
+
+numero_con_datos <- con_datos |> nrow()
+
+porcen_con_datos <- round((numero_con_datos * 100) / numero_desaparecidos_corte , 1)
+
+suma_porcentajes_con_y_sin_datos <- porcen_con_datos + porcen_sin_datos
+
+#### Desaparecidos con datos y CON registro administrativo
+
+numero_con_datos_con_registro_admin <- con_datos |> 
+  filter(indicadora_indicio_de_vida == "con registro administrativo") |> nrow()
+
+### Desaparecidos con datos y SIN registro administrativo
+
+# Debemos sumar los casos que están en BANCI pero no en RNPDNO. Usamos 'Base_BANCI_sin_match_con_RNPDNO'
+Base_BANCI_sin_match_con_RNPDNO <- lista_con_insumos["Base_BANCI_sin_match_con_RNPDNO"] |> 
+  map_dfr(.f = identity)
+
+numero_Base_BANCI_sin_match_con_RNPDNO <- Base_BANCI_sin_match_con_RNPDNO |> nrow()
+
+numero_con_datos_sin_registro_admin <- con_datos |> 
+  filter(indicadora_indicio_de_vida == "sin registro administrativo") |> nrow()
+
+# Sumamos numero_Base_BANCI_sin_match_con_RNPDNO + numero_con_datos_sin_registro_admin
+numero_con_datos_sin_registro_consolidado <- numero_con_datos_sin_registro_admin + 
+  numero_Base_BANCI_sin_match_con_RNPDNO
+
+# Suma de porcentajes de Desaparecidos con datos y CON registro administrativo +
+# Desaparecidos con datos y SIN registro administrativo 
+numero_final <- numero_con_datos_sin_registro_consolidado + 
+  numero_con_datos_con_registro_admin
+
+porcen_numero_con_datos_sin_registro_consolidado <- round((numero_con_datos_sin_registro_consolidado * 100)/numero_final,
+                                                1)
+
+
+porcen_numero_con_datos_con_registro_admin <- round((numero_con_datos_con_registro_admin * 100)/numero_final,
+                                                1)
+
+suma_porcentajes_con_registro_admin_y_sin_registros <- porcen_numero_con_datos_sin_registro_consolidado +
+  porcen_numero_con_datos_con_registro_admin
+
+
+# ------ Localizados ------
+localizados_totales <- comprimido |> 
+  filter(clasificacion_des %in% "Localizados")
+
+numero_localizados_totales <- localizados_totales |> nrow()
+
+porcentaje_loc <- (numero_localizados_totales * 100/registros)
+
+## Localizados con y sin delito (CON VIDA) -----
+
+localizados_con_vida <- localizados_totales |> 
+  filter(estatus == "LOCALIZADA CON VIDA") 
+
+no_localizados_con_vida <- nrow(localizados_con_vida)
+
+localizados_con_vida_con_delito <- localizados_con_vida |> 
+  filter(!is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_con_vida_con_delito <- round((localizados_con_vida_con_delito * 100)/no_localizados_con_vida,
+                                       2)
+
+localizados_con_vida_sin_delito <- localizados_con_vida |> 
+  filter(is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_con_vida_sin_delito <- round((localizados_con_vida_sin_delito * 100)/no_localizados_con_vida,
+                                       2)
+
+suma_porcentajes_delitos_con_vida <- porcen_localizados_con_vida_con_delito +
+  porcen_localizados_con_vida_sin_delito
+
+if(suma_porcentajes_delitos_con_vida != 100) {
+  cat("Advertencia: La suma de los porcentajes de localizados con vida con y sin delito no es igual a 100%. Por favor, revisar los cálculos.")
+} else {
+  cat("La suma de los porcentajes de localizados con vida con y sin delito es igual a 100%.")
+}
+
+## Localizados con y sin delito (SIN VIDA) -----
+
+localizados_sin_vida <- localizados_totales |> 
+  filter(estatus == "LOCALIZADA SIN VIDA") 
+
+no_localizados_sin_vida <- nrow(localizados_sin_vida)
+
+localizados_sin_vida_con_delito <- localizados_sin_vida |> 
+  filter(!is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_sin_vida_con_delito <- round((localizados_sin_vida_con_delito * 100)/no_localizados_sin_vida,
+                                       2)
+
+localizados_sin_vida_sin_delito <- localizados_sin_vida |> 
+  filter(is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_sin_vida_sin_delito <- round((localizados_sin_vida_sin_delito * 100)/no_localizados_sin_vida,
+                                       2)
+
+suma_porcentajes_delitos_sin_vida <- porcen_localizados_sin_vida_con_delito +
+  porcen_localizados_sin_vida_sin_delito
+
+if(suma_porcentajes_delitos_sin_vida != 100) {
+  cat("Advertencia: La suma de los porcentajes de localizados sin vida con y sin delito no es igual a 100%. Por favor, revisar los cálculos.")
+} else {
+  cat("La suma de los porcentajes de localizados sin vida con y sin delito es igual a 100%.")
+}
+
+## Localizados con y sin delito (sin importar si fueron localizados con o sin vida) -----
+
+localizados_generales_sin_delido <- localizados_totales |> 
+  filter(is.na(delitolocalizacion)) |> 
+  nrow()
+
+localizados_generales_con_delido <- localizados_totales |> 
+  filter(!is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_sin_delito <- round((localizados_generales_sin_delido * 100)/numero_localizados_totales,
+                                       1)
+
+porcen_localizados_con_delito <- round((localizados_generales_con_delido * 100)/numero_localizados_totales,
+                                       1)                                      
+
+suma_porcentajes_delitos <- porcen_localizados_sin_delito + porcen_localizados_con_delito
+
+cat("La cantidad de localizados con y sin delito es:", 
+    comma(localizados_generales_con_delido), "y",
+    comma(localizados_generales_sin_delido), "respectivamente. Representan",
+    paste0(porcen_localizados_con_delito, "%"), "y",
+    paste0(porcen_localizados_sin_delito, "%"), "del total de localizados, respectivamente.",
+    "La suma de ambos porcentajes es de:",
+    paste0(suma_porcentajes_delitos, "%"), "\n")
+
+
+# ----- Resultados ------
+cat("El número de registros totales, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(registros), ".\n")
+
+cat("El número de desaparecidos totales, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(numero_desaparecidos_totales), ". Representa", round(porcentaje_des, 1), "del total de registros. \n")
+
+cat("El número de desaparecidos desde 2006, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(numero_desaparecidos_corte), ".\n")
+
+cat("Casos de larga data del año 1952 a 2005:", comma(numero_desaparecidos_totales - numero_desaparecidos_corte),
+    ".\n")
+
+cat("El número de desaparecidos sin datos (con nueva clasificación) es de:",
+    comma(numero_sin_datos),
+    ". Esto representa",
+    paste0(porcen_sin_datos, "%"),
+    "del total de desaparecidos con corte desde 2006.",
+    "\n De los desaparecidos sin datos, los que no tienen municipios son:",
+    comma(dato_municipios),", los que no tienen fecha de nacimiento son:",
+    comma(dato_fecha_nacimiento), ", los que no tienen fecha de desaparición son:",
+    comma(dato_fecha_desaparicion), ", los que no tienen nombre son:",
+    comma(dato_nombre), "y los que no tienen sexo son:",
+    comma(dato_sexo), "\n",
+    "Por otra parte, el número de desaparecidos con datos es de:",
+    comma(numero_con_datos),
+    ". Esto representa",
+    paste0(porcen_con_datos, "%"), "del total de desaparecidos. La suma de los porcentajes de desaparecidos con y sin datos es",
+    paste0(suma_porcentajes_con_y_sin_datos, "%"))
+
+cat("Del número de desaparecidos con datos, es decir, de los", 
+    comma(numero_con_datos),
+    ", la cantidad de personas con datos y con registros administrativos después de su fecha de desaparición es:",
+    comma(numero_con_datos_con_registro_admin), ". Lo cual representa",
+    paste0(porcen_numero_con_datos_con_registro_admin, "% del total de registros con y sin indicios."),
+    "\n Por otro lado, la cantidad de personas con datos pero sin registro administrativo es de:",
+    paste0(comma(numero_con_datos_sin_registro_consolidado), ". Esto representa"),
+    paste0(porcen_numero_con_datos_sin_registro_consolidado, "% del total de registros con y sin indicios."),
+    "\n La suma de los respectivos porcentajes es de:", paste0(suma_porcentajes_con_registro_admin_y_sin_registros, "%"),
+    "\n Asimismo, la BANCI reportó", comma(numero_Base_BANCI_sin_match_con_RNPDNO), "de registros que están en BANCI pero no en RNPDNO.")
+
+cat("El número de localizados totales, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(numero_localizados_totales), ". Representa", paste0(round(porcentaje_loc, 1), "%"), "del total de registros. \n")
+
+cat("Del total de localizados, aquellos con un delito asociado son:",
+    comma(localizados_con_delito),
+    ". Esto representa", paste0(porcen_localizados_con_delito, "%"), "del total de localizados.",
+    "Aquellos NO asociados a algún delito son:", comma(localizados_sin_delito),
+    ". Esto representa",
+    paste0(porcen_localizados_sin_delito , "%"), "del total de localizados. Los porcentajes suman:",
+    suma_porcentajes_delitos, ".\n")
+
+cat("Del total de localizados, aquellos encontrados con vida son:",
+    comma(numero_localizados_con_vida),
+    ". Esto representa", porcen_localizados_con_vida, "del total de localizados",
+    ". Aquellos encontrados sin vida son:", comma(numero_localizados_sin_vida),
+    ". Esto representa",
+    porcen_localizados_sin_vida, "del total de localizados. Los porcentajes suman:",
+    suma_porcentajes_con_o_sin_vida, ".\n")
+
+```
+
+# Tabulados que generan gráficas por entidad federativa y automatización de árbol + datos de fiscalías
+
+Se generan los datos para completar el árbol de personas desaparecidas y localizadas del RNPDNO, además, se agrega información de la BANCI como datos ``sin indicios``. Complementariamente, se genera el tabulado de personas desaparecidas, sin indicios, según reportes y carpetas de investigación de fiscalías. Finalmente, se genera de manera automatizada toda la PPT de la entidad.
+
+\textbf{Notas para usar `reticulate`:}
+
+1. Para acceder a objetos de Python desde R se usa el objeto \texttt{py} (ej. \texttt{py$x} accedería a la variable $x$ creada en Python desde R).
+
+2. Para acceder a objetos de R desde Python se usa el objeto \texttt{r} (ej. \texttt{r.x} accedería a la variable $x$ creada en R desde Python).
+
+3. Cuando queramos salir del ambiente de Python y regresar a R debemos correr `quit`.
+
+
+```{r eval = FALSE}
+# ---------------------------------------------------------------------------- 
+
+# Pegamos con catálogo de estados
+# comprimido <- comprimido |> 
+#   left_join(catalogo_estados, by =c("idestado" = "id_estado"))
+
+# Limpiamos entidad 
+comprimido <- comprimido |> 
+  mutate(estado = str_to_title(estado))
+
+# Definimos entidad
+entidad_de_interes <- "Colima"
+
+# Segmentamos entidad de "comprimido"
+comprimido_entidad <- comprimido |> 
+  filter(estado == entidad_de_interes)
+
+# ----- Número de registros -----
+registros_entidad <- comprimido_entidad |> nrow()
+
+# ------ Desaparecidos ------
+desaparecidos_totales_entidad <- comprimido_entidad |> 
+  filter(!clasificacion_des %in% "Localizados") 
+
+numero_desaparecidos_totales_entidad <- desaparecidos_totales_entidad |> nrow()
+
+porcentaje_des_entidad <- (numero_desaparecidos_totales_entidad * 100/registros_entidad)
+
+## Corte especial desde 2006
+desaparecidos_corte_entidad <- desaparecidos_totales_entidad |> 
+  filter(fecha_hechos_modificada >= "2006-01-01") 
+
+numero_desaparecidos_corte_entidad <- desaparecidos_corte_entidad |> 
+  nrow()
+
+### Desaparecidos sin datos
+sin_datos_entidad <- desaparecidos_corte_entidad |> 
+  filter(clasificacion_des %in% "Pendientes" & indicadora_indicio_de_vida == "sin registro administrativo")
+
+numero_sin_datos_entidad <- sin_datos_entidad |> nrow()
+
+porcen_sin_datos_entidad <- round((numero_sin_datos_entidad * 100)/numero_desaparecidos_corte_entidad, 1)
+
+#### Datos faltantes de "sin datos"
+
+## Municipios
+dato_municipios_entidad <- sin_datos_entidad |> filter(is.na(idmunicipio)) |> nrow()
+
+## Fecha de nacimiento (fechanacimiento)
+dato_fecha_nacimiento_entidad <- sin_datos_entidad |> filter(is.na(fechanacimiento)) |> nrow()
+
+## Fecha de desaparición (fechahechos)
+dato_fecha_desaparicion_entidad <- sin_datos_entidad |> filter(is.na(fechahechos)) |> nrow()
+
+## Nombre (nombre_vic, primerapellido_vic y segundoapellido_vic)
+dato_nombre_entidad <- sin_datos_entidad |> filter(is.na(nombre_vic) | is.na(primerapellido_vic) |
+                                                      is.na(segundoapellido_vic)) |> nrow()
+
+## Sexo
+dato_sexo_entidad <- sin_datos_entidad |> filter(sexo %in% "INDETERMINADO" | is.na (sexo)) |> nrow()
+
+### Desaparecidos con datos
+con_datos_entidad <- desaparecidos_corte_entidad |> 
+  filter(!clasificacion_des %in% "Localizados") |> 
+  filter(indicadora_curp_valida == "valida" | 
+           indicadora_indicio_de_vida == "con registro administrativo") 
+
+numero_con_datos_entidad <- con_datos_entidad |> nrow()
+
+porcen_con_datos_entidad <- round((numero_con_datos_entidad * 100) / numero_desaparecidos_corte_entidad , 1)
+
+suma_porcentajes_con_y_sin_datos_entidad <- porcen_con_datos_entidad + porcen_sin_datos_entidad
+
+#### Desaparecidos con datos y CON registro administrativo
+con_datos_con_registro_admin_entidad <- con_datos_entidad |> 
+  filter(indicadora_indicio_de_vida == "con registro administrativo")
+
+numero_con_datos_con_registro_admin_entidad <- nrow(con_datos_con_registro_admin_entidad)
+
+### Desaparecidos con datos y SIN registro administrativo
+
+# Debemos sumar los casos que están en BANCI pero no en RNPDNO. Usamos 'Base_BANCI_sin_match_con_RNPDNO'
+
+# ----------------------------------------------------------------------- #
+# 1. En caso de que se corra el código de cruce entre BANCI y RNPDNO
+#Base_BANCI_sin_match_con_RNPDNO <- lista_con_insumos["Base_BANCI_sin_match_con_RNPDNO"] |> 
+#  map_dfr(.f = identity)
+
+# 2. En caso contrario
+# Base_BANCI_sin_match_con_RNPDNO 
+# ----------------------------------------------------------------------- #
+
+# Filtramos por entidad de interés
+entidad_de_interes_banci <- "Colima"
+
+Base_BANCI_sin_match_con_RNPDNO_entidad <- Base_BANCI_sin_match_con_RNPDNO |> 
+  filter(entidad_reporta == entidad_de_interes_banci)
+
+numero_Base_BANCI_sin_match_con_RNPDNO_entidad <- Base_BANCI_sin_match_con_RNPDNO_entidad |> nrow()
+
+numero_con_datos_sin_registro_admin_entidad <- con_datos_entidad |> 
+  filter(indicadora_indicio_de_vida == "sin registro administrativo") |> nrow()
+
+# Sumamos numero_Base_BANCI_sin_match_con_RNPDNO + numero_con_datos_sin_registro_admin
+numero_con_datos_sin_registro_consolidado_entidad <- numero_con_datos_sin_registro_admin_entidad + 
+  numero_Base_BANCI_sin_match_con_RNPDNO_entidad
+
+# Suma de porcentajes de Desaparecidos con datos y CON registro administrativo +
+# Desaparecidos con datos y SIN registro administrativo 
+numero_final_entidad <- numero_con_datos_sin_registro_consolidado_entidad + 
+  numero_con_datos_con_registro_admin_entidad
+
+porcen_numero_con_datos_sin_registro_consolidado_entidad <- round((numero_con_datos_sin_registro_consolidado_entidad * 100)/numero_final_entidad,
+                                                1)
+
+
+porcen_numero_con_datos_sin_registro_banci <- round((numero_Base_BANCI_sin_match_con_RNPDNO_entidad * 100)/numero_final_entidad,
+                                                1)
+
+porcen_numero_con_datos_sin_registro_admin_entidad <- round((numero_con_datos_sin_registro_admin_entidad * 100)/numero_final_entidad,
+                                                1)
+
+
+porcen_numero_con_datos_con_registro_admin_entidad <- round((numero_con_datos_con_registro_admin_entidad * 100)/numero_final_entidad,
+                                                1)
+
+suma_porcentajes_con_registro_admin_y_sin_registros_entidad <-
+  porcen_numero_con_datos_sin_registro_banci +
+  porcen_numero_con_datos_sin_registro_admin_entidad +
+  porcen_numero_con_datos_con_registro_admin_entidad
+
+
+# ------ Localizados ------
+localizados_totales_entidad <- comprimido_entidad |> 
+  filter(clasificacion_des %in% "Localizados")
+
+numero_localizados_totales_entidad <- localizados_totales_entidad |> nrow()
+
+porcentaje_loc_entidad <- (numero_localizados_totales_entidad * 100/registros_entidad)
+
+## Localizados con y sin delito (sin importar si son con o sin vida) -----
+localizados_con_delito_entidad <- localizados_totales_entidad |> 
+  filter(!is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_con_delito_entidad <- round((localizados_con_delito_entidad * 100)/numero_localizados_totales_entidad,
+                                       2)
+
+localizados_sin_delito_entidad <- localizados_totales_entidad |> 
+  filter(is.na(delitolocalizacion)) |> 
+  nrow()
+
+porcen_localizados_sin_delito_entidad <- round((localizados_sin_delito_entidad * 100)/numero_localizados_totales_entidad,
+                                       2)
+
+suma_porcentajes_delitos_entidad <- porcen_localizados_con_delito_entidad +
+  porcen_localizados_sin_delito_entidad
+
+## Localizados con y sin vida -----
+numero_localizados_con_vida_entidad <- localizados_totales_entidad |> 
+  filter(estatus == "LOCALIZADA CON VIDA") |> nrow()
+
+porcen_localizados_con_vida_entidad <- round((numero_localizados_con_vida_entidad * 100)/numero_localizados_totales_entidad, 
+                                     1)
+
+numero_localizados_sin_vida_entidad <- localizados_totales_entidad |> 
+  filter(estatus == "LOCALIZADA SIN VIDA") |> nrow()
+
+porcen_localizados_sin_vida_entidad <- round((numero_localizados_sin_vida_entidad * 100)/numero_localizados_totales_entidad, 
+                                     1)
+
+suma_porcentajes_con_o_sin_vida_entidad <- porcen_localizados_con_vida_entidad + porcen_localizados_sin_vida_entidad
+
+# ----- Resultados ------
+cat("El número de registros totales, a la fecha de", as.character(fecha_corte),"en la entidad", entidad_de_interes_banci, "es de:",
+    comma(registros_entidad), ".\n")
+
+cat("El número de desaparecidos totales, a la fecha de", as.character(fecha_corte), "en la entidad", entidad_de_interes_banci,
+    "es de:",
+    comma(numero_desaparecidos_totales_entidad), ". Representa", round(porcentaje_des_entidad, 1), "del total de registros. \n")
+
+cat("El número de desaparecidos desde 2006, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(numero_desaparecidos_corte_entidad), ".\n")
+
+cat("Casos de larga data del año 1952 a 2005:", comma(numero_desaparecidos_totales_entidad - numero_desaparecidos_corte_entidad),
+    ".\n")
+
+cat("Para la entidad", entidad_de_interes_banci,", el número de desaparecidos sin datos (con nueva clasificación) es de:",
+    comma(numero_sin_datos_entidad),
+    ". Esto representa",
+    paste0(porcen_sin_datos_entidad, "%"),
+    "del total de desaparecidos con corte desde 2006.",
+    "\n De los desaparecidos sin datos, los que no tienen municipios son:",
+    comma(dato_municipios_entidad),", los que no tienen fecha de nacimiento son:",
+    comma(dato_fecha_nacimiento_entidad), ", los que no tienen fecha de desaparición son:",
+    comma(dato_fecha_desaparicion_entidad), ", los que no tienen nombre son:",
+    comma(dato_nombre_entidad), "y los que no tienen sexo son:",
+    comma(dato_sexo_entidad), "\n",
+    "Por otra parte, el número de desaparecidos con datos es de:",
+    comma(numero_con_datos_entidad),
+    ". Esto representa",
+    paste0(porcen_con_datos_entidad, "%"), "del total de desaparecidos. La suma de los porcentajes de desaparecidos con y sin datos es",
+    paste0(suma_porcentajes_con_y_sin_datos_entidad, "%"))
+
+cat("Para la entidad",
+    entidad_de_interes_banci,
+    ", del número de desaparecidos con datos, es decir, de los", 
+    comma(numero_con_datos_entidad),
+    ", la cantidad de personas con datos y con registros administrativos después de su fecha de desaparición es:",
+    comma(numero_con_datos_con_registro_admin_entidad), ". Lo cual representa",
+    paste0(porcen_numero_con_datos_con_registro_admin_entidad, "% del total de registros con y sin indicios."),
+    
+    "\n Por otro lado, la cantidad de personas con datos pero sin registro administrativo solo en RNPDNO es de:",
+    paste0(comma(numero_con_datos_sin_registro_admin_entidad), ". Esto representa"),
+    paste0(porcen_numero_con_datos_sin_registro_admin_entidad, "% del total de registros con y sin indicios."),
+    
+    "\n Asimismo, la BANCI reportó", comma(numero_Base_BANCI_sin_match_con_RNPDNO_entidad), "de registros que están en BANCI pero no en RNPDNO. Lo cual representa ", 
+    paste0(porcen_numero_con_datos_sin_registro_banci, "% del total de personas desaparecidas con datos."),
+    
+    "\n La suma de los respectivos porcentajes es de:", paste0(suma_porcentajes_con_registro_admin_y_sin_registros_entidad, "%"))
+
+cat("Para la entidad", 
+    entidad_de_interes_banci,
+    ",el número de localizados totales, a la fecha de", as.character(fecha_corte), "es de:",
+    comma(numero_localizados_totales_entidad), ". Representa", paste0(round(porcentaje_loc_entidad, 1), "%"), "del total de registros. \n")
+
+cat("Para la entidad", 
+    entidad_de_interes_banci,
+    ", del total de localizados, aquellos con un delito asociado son:",
+    comma(localizados_con_delito_entidad),
+    ". Esto representa", paste0(porcen_localizados_con_delito_entidad, "%"), "del total de localizados.",
+    "Aquellos NO asociados a algún delito son:", comma(localizados_sin_delito_entidad),
+    ". Esto representa",
+    paste0(porcen_localizados_sin_delito_entidad, "%"), "del total de localizados. Los porcentajes suman:",
+    suma_porcentajes_delitos_entidad, ".\n")
+
+cat("Para la entidad", 
+    entidad_de_interes_banci,
+    ", del total de localizados, aquellos encontrados con vida son:",
+    comma(numero_localizados_con_vida_entidad),
+    ". Esto representa", porcen_localizados_con_vida_entidad, "del total de localizados",
+    ". Aquellos encontrados sin vida son:", comma(numero_localizados_sin_vida_entidad),
+    ". Esto representa",
+    porcen_localizados_sin_vida_entidad, "del total de localizados. Los porcentajes suman:",
+    suma_porcentajes_con_o_sin_vida_entidad, ".\n")
+
+# ----------------------------------------------------
+# Origen del reporte
+# ----------------------------------------------------
+comprimido_con_datos_sin_registro_entidad <- comprimido_consolidado |> 
+  filter(anio_hechos_consolidada >= 2006,
+         sub_clasificacion == "Desaparecido sin coincidencia con registro administrativo",
+         entidad_de_hecho_o_reporte == entidad_de_interes)
+
+num_comprimido_con_datos_sin_registro_entidad <- comprimido_con_datos_sin_registro_entidad |> 
+  nrow()
+
+cat("El número de personas con datos que no tienen coincidencias administrativas es de:",
+    comma(num_comprimido_con_datos_sin_registro_entidad))
+  
+# ----------------------------------------------------
+# Origen del reporte de la desaparición
+# ----------------------------------------------------
+comprimido_con_datos_sin_registro_entidad |> count(dependencia_origen)
+
+# Calcular porcentajes
+resultados_finales_entidad <- comprimido_con_datos_sin_registro_entidad |> 
+  count(dependencia_origen) |> 
+  mutate(grupo_general = case_when(
+    grepl("Fiscalía", dependencia_origen) ~ "Fiscalía",
+    grepl("Comisión", dependencia_origen) ~ "Comisión",
+    TRUE ~ "Portal"
+  )) |> 
+  # Calculamos el total de la base para el global
+  mutate(total_base = sum(n)) |> 
+  # Agrupamos por el bloque grande (Fiscalía, Comisión, etc.)
+  group_by(grupo_general) |> 
+  mutate(
+    n_grupo = sum(n),                     # Total de ese grupo
+    pct_global = n_grupo / total_base,    # % del grupo vs total de la base
+    pct_interno = n / n_grupo             # % de la subcategoría vs su grupo
+  ) |> 
+  ungroup() |> 
+  # 3. Dar formato y limpiar
+  select(grupo_general, dependencia_origen, n, pct_global, pct_interno) |> 
+  mutate(
+    pct_global = label_percent(accuracy = 0.1)(pct_global),
+    pct_interno = label_percent(accuracy = 0.01)(pct_interno)
+  )
+
+# ----------------------------------------------------
+# Datos para el tabulado
+# ----------------------------------------------------
+
+# 0. Localizados solo de fiscalías
+localizados_entidad <- comprimido_entidad |> 
+  filter(clasificacion_des %in% "Localizados",
+         indicadora_dependencia == "FISCALIA")
+
+unique(sort(localizados_entidad$anio_hechos_modificada))
+
+anio_minimo_localizados_entidad <- min(localizados_entidad$anio_hechos_modificada)
+
+numero_localizados_entidad <- localizados_entidad |> nrow()
+
+numero_localizados_entidad_2006 <- localizados_entidad |> filter(anio_hechos_modificada >= 2006) |> 
+  nrow()
+
+cat("El total de localizados, de casos vinculados a fiscalías, de manera histórica, en la entidad", entidad_de_interes, "es de:", comma(numero_localizados_entidad))
+
+cat("El total de localizados, de casos vinculados a fiscalías, desde 2006, en la entidad", entidad_de_interes, "es de:", comma(numero_localizados_entidad_2006))
+
+
+tabla_localizados_entidad <- localizados_entidad |> 
+  # 1. Filtramos el rango de interés
+  filter(anio_hechos_modificada >= 2006) |> 
+  
+  # 2. Contamos los registros por año
+  count(anio_hechos_modificada) |> 
+  
+  # 3. Completamos la secuencia de años del 2006 al 2025
+  # El argumento 'fill' indica con qué valor rellenar los años que no existían (n = 0)
+  complete(
+    anio_hechos_modificada = 2006:2026, 
+    fill = list(n = 0)
+  ) |> 
+  
+  # 4. Ordenamos para que se vea bien
+  arrange(anio_hechos_modificada)
+ 
+# Cambiar nombres
+names(tabla_localizados_entidad) <- c("Año",
+                                      "Localizados - fiscalías")
+
+# Partimos de comprimido_con_datos_sin_registro_entidad
+
+# Sacamos datos de BANCI
+comprimido_con_datos_sin_registro_entidad |> 
+  filter(origen_categoria_union %in% "Solo banci, sin intersección") |> 
+  nrow()
+
+# 5. Conteo de fiscalías, portal y comisiones
+comprimido_con_datos_sin_registro_entidad |> 
+  count(dependencia_origen)
+
+tabla_clasificacion_comprimido_fiscalias <- comprimido_con_datos_sin_registro_entidad |> 
+  filter(dependencia_origen %in% c("Fiscalía con expediente genérico",
+                                   "Fiscalía con carpeta de investigación")) |> 
+  count(anio_hechos_consolidada,
+        dependencia_origen) |> 
+  filter(anio_hechos_consolidada >= 2006) |> 
+  complete(
+    anio_hechos_consolidada = 2006:2026, 
+    fill = list(n = 0)
+  ) |> 
+  arrange(anio_hechos_consolidada)
+
+tabla_clasificacion_comprimido_fiscalias <- tabla_clasificacion_comprimido_fiscalias |> 
+  pivot_wider(names_from = dependencia_origen,
+              values_from = n,
+              values_fill = 0) 
+
+tabla_clasificacion_comprimido_fiscalias <- 
+  tabla_clasificacion_comprimido_fiscalias |> 
+  rename(Año = anio_hechos_consolidada)
+
+tabla_clasificacion_comprimido_fiscalias <- 
+  tabla_clasificacion_comprimido_fiscalias |> 
+  select(-`NA`)
+
+# Pegamos resultados de localizados - fiscalías
+tabla_clasificacion_comprimido_fiscalias <- 
+  tabla_clasificacion_comprimido_fiscalias |> 
+  left_join(tabla_localizados_entidad,
+            by = "Año")
+
+# Guardar
+writexl::write_xlsx(
+  tabla_clasificacion_comprimido_fiscalias, 
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "PPTs_generadas_por_entidad",
+             "tabulados_10032026",
+             "tabla_clasificacion_comprimido_fiscalias_colima_10032026.xlsx"))
+
+#---------------------------------------#
+# ------- Pegar en PPT nueva --------
+#---------------------------------------#
+
+# Preparamos contador de página 
+contador = 0
+
+#---------------------------------------#
+# ---- Slide de la portada ----
+#---------------------------------------#
+
+contador = contador + 1
+
+# Creamos 'fecha actual'
+fecha_actual <- today()
+
+# Leemos
+presentacion = read_pptx(here::here("RNPDNO",
+                                    "docs",
+                                    "Plantilla para Presidencia y Gabinete 2026.pptx"))
+
+# Portada
+presentacion <- add_slide(presentacion, layout = "portada", master = "master") |>
+  ph_with(value = entidad_de_interes, location = ph_location_label("entidad")) |>
+  ph_with(value = format(fecha_actual, "%d de %B de %Y"), location = ph_location_label("fecha")) |>
+  ph_with(value = "Personas desaparecidas", location = ph_location_label("personas_desaparecidas")) |> 
+  ph_with(value = as.character(contador),location = ph_location_label("contador_1")) #Número de diapositiva
+
+#---------------------------------------#
+# ---- Slide del árbol ------
+#---------------------------------------#
+
+contador = contador + 1
+
+titulo_1 <- fpar(
+                            ftext("Registro Nacional de Personas Desaparecidas y No
+Localizadas |1952 a 2026 | ", fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+                            
+                            ftext(entidad_de_interes, fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = FALSE))
+)
+
+fecha_banci <- format(max(subeR$fha_de_hchos), "%d de %B de %Y")
+larga_data <- comma(numero_desaparecidos_totales_entidad - numero_desaparecidos_corte_entidad)
+
+
+fuente <- fpar(
+  ftext("Fuente: ", fp_text(font.size = 8, color = "#434343",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext("RNPDNO al ", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(format(fecha_actual, "%d de %B de %Y"),fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(" y SESNSP al ", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(fecha_banci, fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(". *", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(comma(numero_Base_BANCI_sin_match_con_RNPDNO_entidad), fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(" carpetas de investigación en la BANCI (Base Nacional de Carpetas de Investigación) a partir de agosto 2025 con la entrada en vigor de la reforma a la ley en materia de desaparición de personas.", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans"))
+)
+
+porcen_sin_indicios <- porcen_numero_con_datos_sin_registro_consolidado_entidad
+num_sin_indicios <- numero_con_datos_sin_registro_consolidado_entidad
+
+presentacion = add_slide(presentacion, layout = "slide_1", master = "master") |>
+  ph_with(value = fuente,
+          location = ph_location_label("fuente")) |> 
+  ph_with(value = comma(numero_con_datos_con_registro_admin_entidad),
+          location = ph_location_label("num_con_actividades")) |> 
+  ph_with(value = paste0(porcen_numero_con_datos_con_registro_admin_entidad, "%"),
+          location = ph_location_label("porcen_con_actividades")) |> 
+  ph_with(value = paste0(comma(num_sin_indicios), "*"),
+          location = ph_location_label("num_sin_indicios")) |> 
+   ph_with(value = paste0(porcen_sin_indicios, "%"),
+          location = ph_location_label("porcen_sin_indicios")) |> 
+  ph_with(value = paste0(porcen_localizados_con_delito_entidad, "%"),
+          location = ph_location_label("porcen_con_delito")) |> 
+  ph_with(value = paste0(porcen_localizados_sin_delito_entidad, "%"),
+          location = ph_location_label("porcen_sin_delito")) |> 
+  ph_with(value = comma(localizados_con_delito_entidad),
+          location = ph_location_label("num_con_delito")) |> 
+  ph_with(value = comma(localizados_sin_delito_entidad),
+          location = ph_location_label("num_sin_delito")) |> 
+  ph_with(value = paste0(porcen_localizados_con_vida_entidad, "%"),
+          location = ph_location_label("porcen_con_vida")) |> 
+  ph_with(value = paste0(porcen_localizados_sin_vida_entidad, "%"),
+          location = ph_location_label("porcen_sin_vida")) |> 
+   ph_with(value = comma(numero_localizados_con_vida_entidad),
+          location = ph_location_label("num_con_vida")) |> 
+  ph_with(value = comma(numero_localizados_sin_vida_entidad),
+          location = ph_location_label("num_sin_vida")) |> 
+  ph_with(value = paste0(round(porcentaje_loc_entidad, 1), "%"),
+          location = ph_location_label("porcen_localizados")) |> 
+  ph_with(value = comma(numero_localizados_totales_entidad),
+          location = ph_location_label("num_localizados")) |> 
+  ph_with(value = comma(dato_municipios_entidad),
+          location = ph_location_label("municipio")) |> 
+  ph_with(value = comma(dato_fecha_nacimiento_entidad),
+          location = ph_location_label("fecha_nacimiento")) |> 
+  ph_with(value = comma(dato_fecha_desaparicion_entidad),
+          location = ph_location_label("fecha_desaparicion")) |> 
+  ph_with(value = comma(dato_nombre_entidad),
+          location = ph_location_label("nombre")) |> 
+  ph_with(value = comma(dato_sexo_entidad),
+          location = ph_location_label("sexo")) |> 
+  ph_with(value = comma(numero_sin_datos_entidad),
+          location = ph_location_label("curp")) |> 
+  ph_with(value = comma(numero_sin_datos_entidad),
+          location = ph_location_label("num_sin_datos")) |> 
+  ph_with(value = paste0(porcen_sin_datos_entidad, "%"),
+          location = ph_location_label("porcen_sin_datos")) |> 
+  ph_with(value = comma(numero_desaparecidos_corte_entidad),
+          location = ph_location_label("desaparecidos_2006")) |> 
+  ph_with(value = comma(numero_desaparecidos_totales_entidad),
+          location = ph_location_label("desaparecidos")) |> 
+  ph_with(value = paste0(round(porcentaje_des_entidad, 1), "%"),
+          location = ph_location_label("porcen_desaparecidos")) |> 
+  ph_with(value = paste0(porcen_con_datos_entidad, "%"),
+          location = ph_location_label("porcen_con_datos")) |> 
+  ph_with(value = comma(numero_con_datos_entidad),
+          location = ph_location_label("num_con_datos")) |> 
+  ph_with(value = comma(registros_entidad),
+          location = ph_location_label("total_registros")) |> 
+  ph_with(value = titulo_1,
+          location = ph_location_label("titulo")) |> 
+  ph_with(value = as.character(contador),location = ph_location_label("contador_2")) |> 
+  ph_with(value = larga_data, location = ph_location_label("larga_data")) #Número de diapositiva
+
+#---------------------------------------#
+# ---- Slide de fiscalías -----
+#---------------------------------------#
+
+contador <- contador + 1
+
+# Título
+titulo_2 <- fpar(
+                            ftext("Registros con datos que no tienen coincidencias con registros administrativos | ", fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+                            
+                            ftext(entidad_de_interes, fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = FALSE))
+)
+
+# Fuente
+fuente_2 <- fpar(
+  ftext("Fuente: ", fp_text(font.size = 8, color = "#434343",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext("RNPDNO al ", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(format(fecha_actual, "%d de %B de %Y"),fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(" y SESNSP de agosto al ", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(fecha_banci, fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans")),
+  ftext(".", fp_text(font.size = 8,  color = "#434343",
+                            font.family = "Noto Sans"))
+)
+
+# Datos de dependencias
+porcen_portal <- resultados_finales_entidad |> 
+                      pull(pct_global) |> 
+                      _[5]
+
+porcen_comision_local <- resultados_finales_entidad |> 
+                      pull(pct_interno) |> 
+                      _[2]
+
+porcen_comision_nacional <- resultados_finales_entidad |> 
+                      pull(pct_interno) |> 
+                      _[1]
+
+porcen_comision_total <- resultados_finales_entidad |> 
+                      pull(pct_global) |> 
+                      _[1]
+
+porcen_reportes <- resultados_finales_entidad |> 
+                      pull(pct_interno) |> 
+                      _[4]
+
+porcen_carpetas <- resultados_finales_entidad |> 
+                      pull(pct_interno) |> 
+                      _[3]
+
+porcen_fiscalia <- resultados_finales_entidad |> 
+                      pull(pct_global) |> 
+                      _[3]
+
+num_sin_indicios <- numero_con_datos_sin_registro_consolidado_entidad
+porcen_sin_indicios <- porcen_numero_con_datos_sin_registro_consolidado_entidad
+
+num_portal <- resultados_finales_entidad |> 
+                      pull(n) |> 
+                      _[5]
+
+num_comision_local <- resultados_finales_entidad |> 
+                      pull(n) |> 
+                      _[2]
+
+num_comision_nacional <- resultados_finales_entidad |> 
+                      pull(n) |> 
+                      _[1]
+
+num_comision_total <- num_comision_local + num_comision_nacional
+
+
+num_reportes <- resultados_finales_entidad |> 
+                      pull(n) |> 
+                      _[4]
+
+num_carpetas <- resultados_finales_entidad |> 
+                      pull(n) |> 
+                      _[3]
+
+num_fiscalia <- num_reportes + num_carpetas
+
+larga_data <- comma(numero_desaparecidos_totales_entidad - numero_desaparecidos_corte_entidad)
+
+presentacion = add_slide(presentacion, layout = "slide_2", master = "master") |>
+  ph_with(value = fuente_2,
+          location = ph_location_label("fuente")) |> 
+    ph_with(value = titulo_2,
+          location = ph_location_label("titulo")) |> 
+  ph_with(value = porcen_portal,
+          location = ph_location_label("porcen_portal")) |> 
+  ph_with(value = porcen_comision_local,
+          location = ph_location_label("porcen_comision_local")) |> 
+  ph_with(value = porcen_comision_nacional,
+          location = ph_location_label("porcen_comision_nacional")) |> 
+  ph_with(value = porcen_comision_total,
+          location = ph_location_label("porcen_comision_total")) |> 
+  ph_with(value = porcen_reportes,
+          location = ph_location_label("porcen_reportes")) |> 
+  ph_with(value = porcen_fiscalia,
+          location = ph_location_label("porcen_fiscalia")) |> 
+  ph_with(value = porcen_carpetas,
+          location = ph_location_label("porcen_carpetas")) |> 
+  ph_with(value = comma(num_sin_indicios),
+          location = ph_location_label("num_sin_indicios")) |> 
+  ph_with(value = paste0(porcen_sin_indicios, "%"),
+          location = ph_location_label("porcen_sin_indicios")) |> 
+  ph_with(value = comma(num_portal),
+          location = ph_location_label("num_portal")) |> 
+  ph_with(value = comma(num_comision_local),
+          location = ph_location_label("num_comision_local")) |> 
+  ph_with(value = comma(num_comision_nacional),
+          location = ph_location_label("num_comision_nacional")) |> 
+  ph_with(value = comma(num_comision_total),
+          location = ph_location_label("num_comision_total")) |> 
+  ph_with(value = comma(num_reportes),
+          location = ph_location_label("num_reportes")) |> 
+  ph_with(value = comma(num_carpetas),
+          location = ph_location_label("num_carpetas")) |> 
+  ph_with(value = comma(num_fiscalia),
+          location = ph_location_label("num_fiscalia"))|> 
+  ph_with(value = as.character(contador),location = ph_location_label("contador_3"))
+
+#---------------------------------------#
+# ---- Slide de gráfica -----
+#---------------------------------------#
+
+contador <- contador + 1
+
+num_ultimo_anio_carpeta <- tabla_clasificacion_comprimido_fiscalias |> 
+                                     pull(`Fiscalía con carpeta de investigación`) |> 
+                                     _[20]
+
+num_ultimo_anio_reporte <- tabla_clasificacion_comprimido_fiscalias |> 
+                                     pull(`Fiscalía con expediente genérico`) |> 
+                                     _[20]
+
+num_ultimo_anio_fiscalia <- num_ultimo_anio_reporte + num_ultimo_anio_carpeta
+
+
+# Título
+titulo_3 <- fpar(
+  ftext("De los ", fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext(comma(num_sin_indicios), fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext(" registros sin indicios ", fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext(comma(num_fiscalia), fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+  ftext(" corresponden a reportes realizados por fiscalías | ", fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = TRUE)),
+                            ftext(entidad_de_interes, fp_text(font.size = 17, color = "#6B1537",
+                            font.family = "Noto Sans", bold = FALSE))
+)
+
+
+presentacion = add_slide(presentacion, layout = "slide_3", master = "master") |>
+  ph_with(value = fuente_2,
+          location = ph_location_label("fuente")) |> 
+  ph_with(value = titulo_3,
+          location = ph_location_label("titulo")) |> 
+  ph_with(value = comma(numero_localizados_entidad_2006),
+          location = ph_location_label("localizados_2006")) |> 
+  ph_with(value = paste0("(",
+                         comma(numero_localizados_entidad),
+                         " desde"),
+          location = ph_location_label("localizados_historicos")) |> 
+  ph_with(value = paste0(anio_minimo_localizados_entidad,
+                         ")"),
+          location = ph_location_label("anio_localizados_historicos")) |> 
+  ph_with(value = comma(num_fiscalia),
+          location = ph_location_label("num_fiscalia")) |> 
+  ph_with(value = as.character(contador),location = ph_location_label("contador_4"))
+
+```
+
+```{r}
+# ---- Guardar diapositivas -----
+# Guardado 
+directorio = paste0(
+  "output/PPT/PPTs_generadas_por_entidad/personas_desaparecidas_", 
+  entidad_de_interes, "_",
+  format(Sys.Date(),"%d%m%Y"),
+  ".pptx")
+
+print(presentacion, target = here::here("RNPDNO",
+                                        directorio))
+
+```
+
+```{r}
+## Llamar al archivo de Pablo
+rnpdno_pablo <- read_csv(here::here("RNPDNO",
+"input", "DESAPARECIDOS_CON_DATOS.csv")) # desaparecidos + pendientes con curp
+
+# verirficar fecha de hechos mínima. Debe ser 2006
+rnpdno_pablo <- rnpdno_pablo |> 
+  mutate(fecha_hechos_modificada = coalesce(fechahechos , fechapercato , fechacaptura))
+
+range(rnpdno_pablo$fecha_hechos_modificada)
+
+rnpdno_pablo$anio_hechos_modificada = year(rnpdno_pablo$fecha_hechos_modificada)
+
+# Cortar a 2006
+rnpdno_pablo_2006 <- rnpdno_pablo |> 
+  filter(fecha_hechos_modificada >= "2006-01-01")
+
+## Cruzar con base local de desaparecidos con datos
+# ------ Desaparecidos ------
+desaparecidos_totales_con_curp <- comprimido |> 
+  filter(clasificacion_des == "Desaparecidos") |> 
+  filter(anio_hechos_modificada >= 2006)
+
+hola <- "hola"
+```
+
+# Data sets de prueba para gráficas
+```{r}
+# --------------------------------------------------------- #
+# Usamos comprimido consolidado -----
+# --------------------------------------------------------- #
+
+# Homologar clasificación de sexo
+comprimido_consolidado  <- comprimido_consolidado |> 
+  mutate(
+    sexo = case_when(
+      sexo == "INDETERMINADO" | is.na(sexo) ~ "NO ESPECIFICA",
+      TRUE ~ sexo
+    )
+  )
+
+# Hacer un count por año y sexo
+comprimido_consolidado_anual_y_sexo <- comprimido_consolidado |> 
+  count(anio_hechos_consolidada , sexo)
+
+# Guardar 
+writexl::write_xlsx(
+  comprimido_consolidado_anual_y_sexo,
+  here::here(
+    "RNPDNO",
+    "output",
+    "resultados_independientes",
+    "comprimido_consolidado_anual_y_sexo.xlsx"
+  )
+)
+
+# Guardar comprimido_consolidado 
+writexl::write_xlsx(
+  comprimido_consolidado,
+  here::here(
+    "RNPDNO",
+    "output",
+    "resultados_independientes",
+    "comprimido_consolidado_13022026.xlsx"
+  )
+)
+
+
+load(here::here("RNPDNO", "output", "cruces_banci_rnpdno", "cruces_banci_rnpdno_13022026", "Base_BANCI_sin_match_con_RNPDNO.RData"))
+
+load(here::here("RNPDNO", "output", "cruces_banci_rnpdno", "cruces_banci_rnpdno_13022026", "Base_BANCI_con_match_con_RNPDNO.RData"))
+
+writexl::write_xlsx(
+  Base_BANCI_sin_match_con_RNPDNO,
+  here::here(
+    "RNPDNO",
+    "output",
+    "resultados_independientes",
+    "Base_BANCI_sin_match_con_RNPDNO_13022026.xlsx"
+  )
+)
+
+
+writexl::write_xlsx(
+  Base_BANCI_sin_match_con_RNPDNO,
+  here::here(
+    "RNPDNO",
+    "output",
+    "resultados_independientes",
+    "Base_BANCI_sin_match_con_RNPDNO_13022026.xlsx"
+  )
+)
+
+writexl::write_xlsx(
+  subeR_desapariciones_desde_agosto,
+  here::here(
+    "RNPDNO",
+    "output",
+    "resultados_independientes",
+    "subeR_desapariciones_desde_agosto_13022026.xlsx"
+  )
+)
+```
+
+# Extra: ver inconsistencias entre Pablo y yo (23.02.2026)
+
+
+```{r}
+# --------------------------------------------------------- #
+# Ver inconsistencias con Pablo ----
+# --------------------------------------------------------- #
+
+# Sinaloa sin match Pablo
+banci_sin_rnpdno_sinaloa_pablo <- read.xlsx(
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "PPTs_generadas_por_entidad",
+             "tabulados_22022026",
+             "banci_sin_match_rnpdno_sinaloa_pablo.xlsx")
+)
+
+# Pegar con Base_BANCI_sin_match_con_RNPDNO_entidad
+anti_match_sinaloa <- Base_BANCI_sin_match_con_RNPDNO_entidad |> 
+  anti_join(
+    banci_sin_rnpdno_sinaloa_pablo , by = "llave"
+  )
+
+# --------------------------------------------------------- #
+# Buscar aquellos 6 registros en la base de BANCI que sí hicieron match con RNPDNO ----
+# --------------------------------------------------------- #
+
+# Sinaloa sin match Pablo
+banci_con_rnpdno_pablo <- read.xlsx(
+  here::here("RNPDNO",
+             "output",
+             "PPT",
+             "PPTs_generadas_por_entidad",
+             "tabulados_22022026",
+             "banci_con_match_rnpdno_pablo.xlsx")
+)
+
+banci_con_rnpdno_pablo <- banci_con_rnpdno_pablo |> 
+   mutate(across(matches("^fha|^fecha"), ~excel_numeric_to_date(as.numeric(.x))))
+
+
+# --------------------------------------------------------- #
+# Ver campos de PUI -----
+# --------------------------------------------------------- #
+
+
+
+```
+## Código extra (13.02.2026)
+```{r}
+# --------------------------------------------------------- #
+# Diferencia entre match Pablo y yo (13.02.2026) -----
+# --------------------------------------------------------- #
+
+# Cargar base de Pablo
+base_BANCI_sin_match_con_RNPDNP_Pablo <- read_excel(here::here("RNPDNO", "output", "cruces_banci_rnpdno", "cruces_banci_rnpdno_13022026", "banci_sin_match_rnpdno_13022026_Pablo.xlsx"))
+
+base_BANCI_sin_match_con_RNPDNP_Pablo$indicador_base_Pablo <- "sin_match_Pablo"
+Base_BANCI_sin_match_con_RNPDNO$indicador_base_Joss <- "sin_match_Joss"
+
+# Partimos de Base_BANCI_sin_match_con_RNPDNO
+
+# Agarramos como indicador nombre completo + fha_de_hechos
+base_BANCI_sin_match_con_RNPDNP_Pablo <- base_BANCI_sin_match_con_RNPDNP_Pablo |> 
+  mutate(
+    llave_nombre_fha_hechos = glue("{nombres} {primer_apellido} {segundo_apellido} {fecha_hechos}")
+  )
+
+Base_BANCI_sin_match_con_RNPDNO <- Base_BANCI_sin_match_con_RNPDNO |> 
+  mutate(
+    llave_nombre_fha_hechos = glue("{nombres} {primer_apellido} {segundo_apellido} {fha_de_hchos}")
+  )
+
+# Solo seleccionar variables indispensables
+base_BANCI_sin_match_con_RNPDNP_Pablo_resum <- base_BANCI_sin_match_con_RNPDNP_Pablo |> 
+  select(llave_nombre_fha_hechos,
+  nombres, 
+  primer_apellido,
+  segundo_apellido,
+  entidad_reporta,
+  fha_de_ini = fecha_inicio,
+  fha_de_hchos = fecha_hechos,
+  fha_nac,
+  curp_limpia,
+  es_curp_valida,
+  tipo_match,
+  indicador_base_Pablo)
+
+Base_BANCI_sin_match_con_RNPDNO_resum <- Base_BANCI_sin_match_con_RNPDNO |> 
+  select(llave_nombre_fha_hechos,
+  nombres, 
+  primer_apellido,
+  segundo_apellido,
+  entidad_reporta,
+  fha_de_ini,
+  fha_de_hchos,
+  fha_nac,
+  curp_limpia,
+  indicadora_nombre_valido_Joss = indicadora_nombre_valido,
+  indicadora_identidad_valida_Joss = indicadora_identidad_valida,
+  indicadora_curp_limpia_valida = indicadora_curp_limpia_valida,
+  curp,
+  folio_rnpdno,
+  sexo,
+  tipo_match,
+  indicador_base_Joss
+    )
+
+# Ver repetidos
+Base_BANCI_sin_match_con_RNPDNO |> 
+  group_by(nombres, primer_apellido, fha_de_hchos, llave) |> 
+  filter(n() > 1) |> 
+  nrow()
+
+# Ver repetidos
+base_BANCI_sin_match_con_RNPDNP_Pablo |> 
+  group_by(nombres, primer_apellido, fecha_hechos, llave) |> 
+  filter(n() > 1) |> 
+  nrow()
+
+
+# Full join
+Base_sin_match_BANCI_rnpdno_full <- Base_BANCI_sin_match_con_RNPDNO_resum |> 
+  full_join(base_BANCI_sin_match_con_RNPDNP_Pablo_resum,
+  by =  "llave_nombre_fha_hechos", suffix = c("_joss", "_pablo"))
+
+# Ver repetidos
+Base_sin_match_BANCI_rnpdno_full |> 
+  group_by(llave_nombre_fha_hechos) |> 
+  filter(n() > 1) |> 
+  View()
+
+Base_sin_match_BANCI_rnpdno_full <- Base_sin_match_BANCI_rnpdno_full |> 
+  distinct(llave_nombre_fha_hechos , .keep_all = TRUE)
+
+```
+
+# Extra: Ver cuántos fubs de la lista de Mariano de CNB están en la base de RNPDNP (comprimido)
+
+```{r}
+# Cargar lista de Mariano
+lista_mariano <- read_excel(here::here("RNPDNO",
+                                      "input",
+                                      "datos_cnb",
+                                      "base_feb2026_cnb_fub.xlsx"))
+
+# Crear un indicador si el fub de Mariano está en comprimido y pegar entidad de desaparición (identidad), fecha de desaparición, clasificacion_des, etc.
+
+# Pegamos con catálogo de estados
+comprimido <- comprimido |> 
+   left_join(catalogo_estados, by =c("idestado" = "id_estado"))
+
+# Convertir a to_title
+comprimido <- comprimido |> 
+  mutate(estado = str_to_title(estado))
+
+lista_mariano_con_comprimido <- lista_mariano |> 
+  left_join(
+    comprimido |> 
+      mutate(indicador_rnpdno = "en_rnpdno") |>
+      select(fub, estado, clasificacion_des, fecha_hechos_modificada, nombre_vic, primerapellido_vic, segundoapellido_vic, indicador_rnpdno),
+    by = "fub"
+  ) |> 
+  mutate(indicador_en_comprimido = if_else(!is.na(indicador_rnpdno), "Sí está en RNPDNO", "No está en RNPDNO"))
+
+lista_mariano_con_comprimido |> 
+  count(indicador_en_comprimido)
+
+lista_mariano_con_comprimido |> 
+  count(clasificacion_des)
+
+lista_mariano_con_comprimido |> 
+  count(estado) |> 
+  View()
+
+```
+
+# Extra: hacer count por entidad en Banci sin match con RNPDNO
+
+
+```{r}
+# Hacemos un count de la entidad_reporta
+Base_BANCI_sin_match_con_RNPDNO_entidades_v2 <- Base_BANCI_sin_match_con_RNPDNO |> 
+  group_by(entidad_reporta) |> 
+  count() |> 
+  arrange(desc(n))
+
+names(Base_BANCI_sin_match_con_RNPDNO_entidades_v2) <- c("Entidad que reporta desaparición", "Número de registros sin match con RNPDNO")
+
+# Pegamos Base_BANCI_sin_match_con_RNPDNO_entidades con Base_BANCI_sin_match_con_RNPDNO_entidades_v2
+Base_BANCI_sin_match_con_RNPDNO_entidades <- Base_BANCI_sin_match_con_RNPDNO_entidades |> 
+  left_join(Base_BANCI_sin_match_con_RNPDNO_entidades_v2, by = c("Entidad que reporta desaparición" = "Entidad que reporta desaparición"))
+
+names(Base_BANCI_sin_match_con_RNPDNO_entidades) <- c("Entidad que reporta desaparición", "Número de registros sin match con RNPDNO (corte 28 feb. 2026)", "Número de registros sin match con RNPDNO (corte 31 ene. 2026)")
+
+# Llenar con 0 cuando no hay registros sin match con RNPDNO
+Base_BANCI_sin_match_con_RNPDNO_entidades <- Base_BANCI_sin_match_con_RNPDNO_entidades |> 
+  mutate(across(where(is.numeric), ~ replace_na(., 0)))
+
+# Corregimos inconsistencias de nombres de entidades
+Base_BANCI_sin_match_con_RNPDNO_entidades <- Base_BANCI_sin_match_con_RNPDNO_entidades |> 
+  mutate(`Entidad que reporta desaparición` = case_when(
+    `Entidad que reporta desaparición` == "Michoacan" ~ "Michoacán",
+    `Entidad que reporta desaparición` == "Ciudad De Mexico" ~ "Ciudad de México",
+    `Entidad que reporta desaparición` == "Mexico" ~ "México",
+    `Entidad que reporta desaparición` == "San Luis Potosi" ~ "San Luis Potosí",
+    TRUE ~ `Entidad que reporta desaparición`
+  ))
+
+# Volver a hacer sumas en cada fila
+Base_BANCI_sin_match_con_RNPDNO_entidades <- Base_BANCI_sin_match_con_RNPDNO_entidades |>
+  group_by(`Entidad que reporta desaparición`) |>
+  summarise(
+    `Número de registros sin match con RNPDNO (corte 28 feb. 2026)` = sum(`Número de registros sin match con RNPDNO (corte 28 feb. 2026)`),
+    `Número de registros sin match con RNPDNO (corte 31 ene. 2026)` = sum(`Número de registros sin match con RNPDNO (corte 31 ene. 2026)`)
+  ) |> ungroup()
+
+# Guardamos
+writexl::write_xlsx(
+  Base_BANCI_sin_match_con_RNPDNO_entidades,
+  here::here("RNPDNO",
+             "output",
+             "cruces_banci_rnpdno",
+             "cruces_banci_rnpdno_13032026",
+             "Base_BANCI_sin_match_con_RNPDNO_entidades_13032026.xlsx"))
+
+# Guardamos
+writexl::write_xlsx(
+  Base_BANCI_sin_match_con_RNPDNO,
+  here::here("RNPDNO",
+             "output",
+             "cruces_banci_rnpdno",
+             "cruces_banci_rnpdno_13032026",
+             "Base_BANCI_sin_match_con_RNPDNO_13032026.xlsx"))
+
+
+
+
+```
+
+:::

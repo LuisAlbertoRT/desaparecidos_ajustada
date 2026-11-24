@@ -12,9 +12,9 @@ dos "indicios de vida" que no son el mismo dato y no se calculan igual.**
 | | `cind` / `sind` | `fmz` (lámina 12) |
 |---|---|---|
 | **Qué es** | bandera del universo: esta persona tiene registro administrativo posterior a su desaparición | cuántos indicios de un corte congelado ya derivaron en una localización |
-| **De dónde sale** | `input/pui/` → notebook 3 → `Resultado_3_*.parquet` | `input/domicilios_y_numeros_contacto/…24062026.xlsx` |
+| **De dónde sale** | `input/pui/` → notebook 3 → `Resultado_3_*.parquet` | `input/domicilios_y_numeros_contacto/Directorio_nacional_18112026_insumo.xlsx` |
 | **¿Pasa por el pipeline?** | sí: CAPA A la integra, CAPA B la convierte en bandera | **no**: es una foto fija que se cruza aparte |
-| **¿Se recalcula cada corrida?** | sí, con la PUI del día | no: el archivo está congelado al 24/06/2026 |
+| **¿Se recalcula cada corrida?** | sí, con la PUI del día | no: el archivo está congelado al 18/11/2026 |
 | **Quién lo calcula** | `carga.py` + `derivadas.py` | `src.directorio_indicios.indicios_formalizados` |
 | **Dónde aparece** | `..._des_cisf_cind`, `..._des_sisf` | `reg_rn_24jun26-max_loc_fmz` y sus variantes |
 
@@ -38,7 +38,7 @@ graph TD
     CB --> S["CAPA C · Slice<br><code>cisf_cind</code>, <code>cisf_sind</code>, <code>sisf</code>"]
     S --> M[("marcadores {{...}}")]:::sal
 
-    DIR[("base_combinada_con_domicilio…24062026.xlsx<br><i>directorio congelado</i>")]:::fuente --> IF["src.directorio_indicios.indicios_formalizados"]
+    DIR[("Directorio_nacional_18112026_insumo.xlsx<br><i>directorio congelado</i>")]:::fuente --> IF["src.directorio_indicios.indicios_formalizados"]
     CB -.->|sólo el estatus vigente por fub| IF
     IF -->|extra=| M
 ```
@@ -466,12 +466,13 @@ La lámina 12 del reporte diario **no usa nada de lo anterior**. Su población s
 
 ```
 input/domicilios_y_numeros_contacto/
-    base_combinada_con_domicilio_y_numeros_de_contacto_24062026.xlsx
+    Directorio_nacional_18112026_insumo.xlsx
 ```
 
-Una foto fija de las personas con indicio de vida al **24/06/2026** —43,238 en el archivo
+Una foto fija de las personas con indicio de vida al **18/11/2026** —42,220 en el archivo
 vigente—, con domicilio y teléfonos, entregada ya hecha desde fuera. Trae 37 columnas y sólo
-se usan dos: `FUB` y `Estado de Desaparición`.
+se usan dos: `FUB` y `Estado de Desaparición`. La hoja se llama `Personas desaparecidas` y
+los encabezados empiezan en la fila 2.
 
 La pregunta que responde es otra: **de aquellos indicios, ¿a cuántos les siguió una
 localización?** De ahí el token `fmz` = *formalizados*. Lo calcula
@@ -500,20 +501,21 @@ mismos renombres que el directorio.
 
 | Marcador | Corrida 06/10/2026 | Qué es |
 |---|---:|---|
-| `reg_rn_24jun26-max_loc_fmz` | 4,421 | formalizados en las 24 entidades |
-| `pct_reg_rn_24jun26-max_loc_fmz` | 92.3 % | su parte del total del país |
-| `reg_rn_24jun26-max_loc_fmz_v2` | 4,788 | los mismos formalizados, **sin acotar**: todo el país |
-| `reg_rn_24jun26-max_loc_fmz_v3` | 367 | el complemento: los del resto del país |
-| `gr_ent_rn_24jun26-max_loc_fmz` | 33,430 en 24 filas | desglose por entidad, apilado |
-| `reg_rn_24jun26-max_loc_fmz_v4` | 4,787 | formalizados en las 32 entidades federativas |
-| `gr_32ent_rn_24jun26-max_loc_fmz` | 43,118 en 32 filas | su desglose por entidad, apilado |
+| `reg_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | formalizados en las 24 entidades |
+| `pct_reg_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | su parte del total del país |
+| `reg_rn_24jun26-max_loc_fmz_v2` | se actualiza al ejecutar | los mismos formalizados, **sin acotar**: todo el país |
+| `reg_rn_24jun26-max_loc_fmz_v3` | se actualiza al ejecutar | el complemento: los del resto del país |
+| `gr_ent_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | desglose por entidad, apilado |
+| `reg_rn_24jun26-max_loc_fmz_v4` | se actualiza al ejecutar | formalizados en las 32 entidades federativas |
+| `gr_32ent_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | su desglose por entidad, apilado |
 
 Las siete cifras salen de **una sola pasada** de `indicios_formalizados`, precisamente para
 que no puedan discrepar entre sí, y entran al diccionario de la plantilla por `extra=` en
 `Universo.indicadores`, igual que el cruce de MJ y RIPS de la última lámina.
 
-Los nombres se arman con `config.DIRECTORIO_INDICIOS_CORTE` (`"24jun26"`): cambiar esa
-constante y el archivo renombra los siete marcadores a la vez. La nomenclatura completa está
+Los nombres conservan `config.DIRECTORIO_INDICIOS_CORTE` (`"24jun26"`) para corresponder con
+los marcadores ya existentes en la plantilla; el archivo fuente se actualizó al
+`18/11/2026` y su fecha real se informa por separado. La nomenclatura completa está
 en [`catalogo_abreviaturas.md`](../catalogo_abreviaturas.md) §9 quáter.
 
 > El repositorio **no documenta quién produce ese archivo ni con qué criterio se marcó cada

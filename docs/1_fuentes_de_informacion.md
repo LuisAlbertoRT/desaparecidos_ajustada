@@ -185,7 +185,7 @@ su población no sale del RNPDNO ni de BANCI, y lo único que se le pide al univ
 
 | Ruta y constante | Alimenta | Detalle |
 |---|---|---|
-| `input/domicilios_y_numeros_contacto/base_combinada_con_domicilio_y_numeros_de_contacto_24062026.xlsx` — `DIRECTORIO_INDICIOS_FILE` | lámina 12: indicios ya formalizados como localización (`*_loc_fmz`) | corte congelado al 24/06/2026; de sus 37 columnas sólo se usan `FUB` y `Estado de Desaparición`. Ver [8.6](8_indicios_de_vida.md) |
+| `input/domicilios_y_numeros_contacto/Directorio_nacional_18112026_insumo.xlsx` — `DIRECTORIO_INDICIOS_FILE` | lámina 12: indicios ya formalizados como localización (`*_loc_fmz`) | archivo con fecha 18/11/2026; de sus 37 columnas sólo se usan `FUB` y `Estado de Desaparición`. Se mantienen los marcadores `24jun26` de la plantilla. Ver [8.6](8_indicios_de_vida.md) |
 | `input/mj/MJ y RIPS (1062).xlsx` — `MJ_RIPS_FILE` | última lámina: detenciones penitenciarias (`reg_mr_*`) | dos hojas, `MJ UNICOS` y `RIPS UNICOS`, que se concatenan sin deduplicar |
 
 ## Salidas del ETL

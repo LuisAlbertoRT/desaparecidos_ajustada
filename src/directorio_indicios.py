@@ -170,6 +170,7 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
         config.DIRECTORIO_INDICIOS_FILE,
         config.DIRECTORIO_INDICIOS_COLUMN_MAPPING,
         hoja=config.DIRECTORIO_INDICIOS_SHEET,
+        skiprows=config.DIRECTORIO_INDICIOS_SKIPROWS,
         descripcion="directorio de indicios de vida",
     )
 
@@ -279,7 +280,7 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
 
     if verbose:
         sin_cruce = int(d["clasificacion_des"].isna().sum())
-        print(f"  📇 Directorio de indicios ({config.DIRECTORIO_INDICIOS_CORTE}): "
+        print(f"  📇 Directorio de indicios ({config.DIRECTORIO_INDICIOS_FECHA_CORTE}): "
               f"{len(directorio):,} personas")
         print(f"     formalizados como localización : {total:,} "
               f"({pct} del total del país)")

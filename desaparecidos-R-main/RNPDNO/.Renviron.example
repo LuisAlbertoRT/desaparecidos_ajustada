@@ -1,0 +1,10 @@
+# .Renviron.example
+# Copia este archivo como .Renviron (sin extensión adicional) en la raíz de RNPDNO
+# y ajusta la ruta a donde te haya quedado montada tu carpeta de Drive.
+
+# Dirección a donde apunta la carpeta de Drive
+# Scripts de R en donde es útil:
+# 1. funcion_banci_rnpdno_matching_completo.R
+# La ruta es específica para cada usuario. Se recomienda descargar Google Drive para escritorio.
+# Ej.:
+RNPDNO_data_raiz=G:/Mi unidad/Personas_desaparecidas
