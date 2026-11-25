@@ -253,11 +253,13 @@ Un marcador que **no** es una rebanada del universo, aunque lo parezca:
 ```
 reg_rn_24jun26-max_loc_fmz        total de indicios ya formalizados
 pct_reg_rn_24jun26-max_loc_fmz    su porcentaje contra el total del país
-reg_rn_24jun26-max_loc_fmz_v2     el mismo conteo, pero de todo el país
-reg_rn_24jun26-max_loc_fmz_v3     el complemento del anterior: el resto del país
+reg_rn_24jun26-max_loc_fmz_v2     formalizados en la gráfica de las 32 entidades
+reg_rn_24jun26-max_loc_fmz_v3     el resto del directorio nacional
 gr_ent_rn_24jun26-max_loc_fmz     su desglose por entidad
 reg_rn_24jun26-max_loc_fmz_v4     el total, pero de las 32 entidades federativas
 gr_32ent_rn_24jun26-max_loc_fmz   su desglose por entidad, de esas 32
+reg_rn_24jun26-max_loc_fmz_v2_v3  formalizados en las 32 con entidad imputada
+gr_32ent_rn_24jun26-max_loc_fmz_imp su desglose con entidad imputada
 ```
 
 > No confundir este `fmz` con la bandera `cind` de la sección 4: son dos "indicios de vida"
@@ -280,29 +282,15 @@ Dos criterios que conviene tener presentes:
 - El conteo se acota a las 24 entidades de `config.DIRECTORIO_INDICIOS_ESTADOS`, las que
   participan en la Búsqueda Generalizada. Las demás quedan fuera **a propósito**.
 
-### El sufijo `_v2`: el mismo conteo, sin acotar por entidad
+### El sufijo `_v2`: las 32 entidades sin imputación
 
-`reg_rn_24jun26-max_loc_fmz_v2` es exactamente el mismo indicador que
-`reg_rn_24jun26-max_loc_fmz` —los indicios del directorio que ya se formalizaron como
-localización— con **una sola diferencia**: no se filtra a `DIRECTORIO_INDICIOS_ESTADOS`,
-así que cuenta a todo el país. La lámina lo rotula "Total de país" y por eso el otro
-marcador es siempre menor o igual:
-
-```
-reg_rn_24jun26-max_loc_fmz     3,927   sólo las 24 entidades de la Búsqueda Generalizada
-reg_rn_24jun26-max_loc_fmz_v2  4,217   todas las entidades del directorio
-reg_rn_24jun26-max_loc_fmz_v3    290   el resto del país  (= _v2 − el primero)
-```
-
-*(cifras de la corrida del 14/09/2026; cambian con cada corte del RNPDNO, porque el
-directorio está congelado pero el estatus contra el que se cruza no.)*
-
-El `_v2` **no** es una versión nueva que reemplace a la anterior: las dos conviven en la
-misma lámina. Es el único marcador de la plantilla que lleva ese sufijo.
+`reg_rn_24jun26-max_loc_fmz_v2` cuenta los formalizados de las 32 entidades federativas
+que aparecen en `gr_32ent_rn_24jun26-max_loc_fmz`. Excluye los registros sin entidad
+válida y coincide con `_v4`.
 
 `pct_reg_rn_24jun26-max_loc_fmz` no sigue la regla del padre de la sección 10 —no hay
-`Slice` del que colgarse—: su denominador es el **total del país**, o sea el propio
-`_v2`. Mide qué parte de los formalizados de todo el directorio cae en las 24 entidades
+`Slice` del que colgarse—: su denominador es el **total del directorio**, incluidos
+los formalizados sin entidad válida. Mide qué parte cae en las 24 entidades
 de la Búsqueda Generalizada:
 
 ```
@@ -315,14 +303,15 @@ disponible como `universo`, pero sólo alimenta la gráfica y el log.
 
 ### El sufijo `_v3`: el resto del país
 
-`reg_rn_24jun26-max_loc_fmz_v3` es el complemento exacto del primero dentro del `_v2`:
+`reg_rn_24jun26-max_loc_fmz_v3` es el complemento del primero dentro del total nacional
+del directorio, que puede diferir de `_v2`:
 
 ```
-reg_..._fmz  +  reg_..._fmz_v3  =  reg_..._fmz_v2
+reg_..._fmz  +  reg_..._fmz_v3  =  nacional
 ```
 
 La resta la hace `indicios_formalizados` —devuelve `resto`— y no el cuaderno, para que las
-tres cifras de la lámina salgan de la misma pasada y no puedan discrepar.
+conteos del directorio salgan de la misma pasada.
 
 ### El sufijo `_v4` y la gráfica `gr_32ent`: las 32 entidades
 
@@ -330,13 +319,10 @@ La plantilla trae una lámina gemela que no acota a la Búsqueda Generalizada.
 `reg_rn_24jun26-max_loc_fmz_v4` cuenta los formalizados de las **32 entidades
 federativas** y `gr_32ent_rn_24jun26-max_loc_fmz` los desglosa, una barra por entidad.
 
-No es el `_v2`: éste cuenta todo el directorio, incluso a quien no tiene entidad
-("Nacido en el extranjero"), y el `_v4` sólo a las 32. Por eso:
-
-```
-reg_..._fmz  ≤  reg_..._fmz_v4  ≤  reg_..._fmz_v2
-   4,421            4,787              4,788        (corrida del 06/10/2026)
-```
+`_v2` usa el mismo total que `_v4`. Para la gráfica `_imp`,
+`reg_rn_24jun26-max_loc_fmz_v2_v3` usa el total de las 32 entidades después de
+imputar la entidad de los localizados sin entidad válida; los que siguen sin entidad
+se excluyen de la gráfica y de ese marcador.
 
 Las 32 no se teclean: salen del catálogo INEGI `config.ENTIDADES` (claves 1 a 32), con los
 mismos renombres que el directorio (`México` → `Estado de México`).

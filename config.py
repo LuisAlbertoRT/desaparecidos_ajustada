@@ -359,7 +359,7 @@ def pui_coincidencias_mas_reciente(directorio=None) -> Path | None:
 PUI_LOCAL_FILE = _ruta_declarada(
     "PIPELINE_PUI_ARCHIVO",
     #PUI_DIR / "reporte_coincidencias_validas_2026-07-01.csv",                  # <------ Aquí se cambia el archivo de PUI
-    PUI_DIR / "reporte_coincidencias_validas_2026-11-24.csv",                   # <------ Aquí se cambia el archivo de PUI
+    PUI_DIR / "reporte_coincidencias_validas_2026-11-25.csv",                   # <------ Aquí se cambia el archivo de PUI
 )
 
 # El insumo que leen el notebook 3 y src/drive.py. En modo "drive" es el corte que
@@ -565,12 +565,16 @@ PPT_DIARIO_FILE = ppt_diario_file()
 # como localización (de ahí el token `fmz` = formalizados).
 #
 # Alimenta estos marcadores de la plantilla:
+#     {{reg_rn_24jun26-max_p1}}          total de personas del directorio
+#     {{r_p8}}                           personas en las entidades de búsqueda
+#     {{r_p8_1}}                         porcentaje de ese universo
+#     {{r_p9}}                           personas en las otras entidades
+#     {{r_p9_1}}                         porcentaje de ese universo
 #     {{reg_rn_24jun26-max_loc_fmz}}      total formalizado, acotado a
 #                                         DIRECTORIO_INDICIOS_ESTADOS
 #     {{pct_reg_rn_24jun26-max_loc_fmz}}  su porcentaje, contra el total de
-#                                         formalizados del país (el `_v2`)
-#     {{reg_rn_24jun26-max_loc_fmz_v2}}   el mismo total SIN acotar por entidad:
-#                                         el conteo de todo el país
+#                                         formalizados del país
+#     {{reg_rn_24jun26-max_loc_fmz_v2}}   formalizados en las 32 entidades
 #     {{reg_rn_24jun26-max_loc_fmz_v3}}   el resto del país (`_v2` − el primero)
 #     {{gr_ent_rn_24jun26-max_loc_fmz}}   desglose por entidad
 #     {{reg_rn_24jun26-max_loc_fmz_v4}}   total formalizado en las 32 entidades

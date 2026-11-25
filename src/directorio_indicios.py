@@ -160,9 +160,12 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
                        FUERA de esas entidades; alimenta el marcador `_v3`.
         - `universo` : personas del directorio en esas mismas entidades
                        (las dos series de la gráfica sumadas).
+        - `universo_nacional` : total de personas del directorio, sin acotar
+                                por entidad.
         - `total_32` : formalizados en las 32 entidades federativas, o sea
                        `nacional` sin lo que no es una entidad ("Nacido en el
-                       extranjero"); alimenta el marcador `_v4`.
+                       extranjero"); alimenta los marcadores `_v2` y `_v4`,
+                       o `_v2_v3` en la pasada con imputación.
         - `sin_estado`: registros localizados sin entidad federativa de
                         desaparición, que se excluyen del desglose por entidad.
     """
@@ -241,8 +244,8 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
     )
 
     # El conteo nacional se toma ANTES de acotar por entidad: mismo criterio de
-    # formalización, pero sobre todo el directorio. Alimenta el marcador `_v2`,
-    # que la lámina rotula "Total de país".
+    # formalización, pero sobre todo el directorio. Se conserva para el
+    # denominador de `pct` y el complemento `resto`.
     nacional = int(es_loc.sum())
 
     # La lámina de las 32 entidades: el mismo tabulado, sin acotar a la Búsqueda
@@ -268,14 +271,11 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
     # series de la gráfica sumadas. Es el 33,430 que la lámina rotula
     # "Entidades participantes en la Búsqueda Generalizada".
     universo = total + int(tabulado["todavia_desaparecidos"].sum())
-    # Denominador del porcentaje: el TOTAL DEL PAÍS de formalizados, el mismo
-    # conteo del marcador `_v2`. El `pct` responde entonces qué parte de los
-    # formalizados del país cae en las entidades de la Búsqueda Generalizada.
+    # Denominador del porcentaje: el total de formalizados del directorio.
+    # El `pct` responde qué parte cae en las entidades de Búsqueda Generalizada.
     pct = f"{100 * total / nacional:.1f}%" if nacional else "n/d"
     # Los formalizados del resto del país: el complemento de `total` dentro de
-    # `nacional`, que es justo lo que pide el marcador `_v3`. Se resta aquí y no
-    # en el cuaderno para que las tres cifras de la lámina —la de las entidades,
-    # la del país y la del resto— salgan de la misma pasada y no puedan discrepar.
+    # `nacional`, que es lo que pide el marcador `_v3`.
     resto = nacional - total
 
     if verbose:
@@ -301,5 +301,6 @@ def indicios_formalizados(comprimido, verbose: bool = True, imputar: bool = Fals
                   f"cuentan como todavía desaparecidos.")
 
     return tabulado, tabulado_32, {"total": total, "universo": universo,
+                                   "universo_nacional": len(directorio),
                                    "pct": pct, "nacional": nacional, "resto": resto,
                                    "total_32": total_32, "sin_estado": sin_estado}

@@ -503,15 +503,19 @@ mismos renombres que el directorio.
 |---|---:|---|
 | `reg_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | formalizados en las 24 entidades |
 | `pct_reg_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | su parte del total del país |
-| `reg_rn_24jun26-max_loc_fmz_v2` | se actualiza al ejecutar | los mismos formalizados, **sin acotar**: todo el país |
+| `reg_rn_24jun26-max_loc_fmz_v2` | se actualiza al ejecutar | formalizados en las 32 entidades de la gráfica sin imputar |
 | `reg_rn_24jun26-max_loc_fmz_v3` | se actualiza al ejecutar | el complemento: los del resto del país |
 | `gr_ent_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | desglose por entidad, apilado |
 | `reg_rn_24jun26-max_loc_fmz_v4` | se actualiza al ejecutar | formalizados en las 32 entidades federativas |
 | `gr_32ent_rn_24jun26-max_loc_fmz` | se actualiza al ejecutar | su desglose por entidad, apilado |
+| `reg_rn_24jun26-max_loc_fmz_v2_v3` | se actualiza al ejecutar | formalizados en las 32 entidades de la gráfica con imputación |
+| `gr_32ent_rn_24jun26-max_loc_fmz_imp` | se actualiza al ejecutar | desglose con entidad imputada para localizados sin entidad válida |
 
-Las siete cifras salen de **una sola pasada** de `indicios_formalizados`, precisamente para
-que no puedan discrepar entre sí, y entran al diccionario de la plantilla por `extra=` en
-`Universo.indicadores`, igual que el cruce de MJ y RIPS de la última lámina.
+Los marcadores de las 32 entidades usan `total_32` de la misma pasada que su gráfica,
+respectivamente sin y con imputación. El porcentaje y el complemento `_v3` mantienen
+su cálculo sobre todo el directorio, incluidos los formalizados sin entidad válida;
+por tanto, su total nacional puede diferir del marcador `_v2`. Los conteos entran al
+diccionario de la plantilla por `extra=` en `Universo.indicadores`.
 
 Los nombres conservan `config.DIRECTORIO_INDICIOS_CORTE` (`"24jun26"`) para corresponder con
 los marcadores ya existentes en la plantilla; el archivo fuente se actualizó al
